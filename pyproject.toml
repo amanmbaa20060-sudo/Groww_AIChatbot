@@ -1,0 +1,11 @@
+[project]
+name = "groww-rag-chatbot-m2"
+version = "0.1.0"
+requires-python = ">=3.10"
+readme = "README.md"
+description = "Facts-only mutual fund FAQ RAG (HDFC / Groww closed corpus)"
+
+[tool.pyright]
+pythonVersion = "3.10"
+venvPath = "."
+venv = ".venv"

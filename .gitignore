@@ -1,0 +1,19 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+!.env.example
+*.egg-info/
+dist/
+build/
+
+# Phase 1 generated data
+data/raw/
+data/normalized/
+data/chunks/
+data/embeddings/
+data/index/
+data/registry/
