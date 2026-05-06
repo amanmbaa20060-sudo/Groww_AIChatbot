@@ -11,9 +11,4 @@ dist/
 build/
 
 # Phase 1 generated data
-data/raw/
-data/normalized/
-data/chunks/
-data/embeddings/
-data/index/
-data/registry/
+# (Intentionally committed for this repo, so disabled ignores.)

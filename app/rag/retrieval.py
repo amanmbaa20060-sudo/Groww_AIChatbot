@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -70,6 +71,124 @@ class ChunkHit:
     section_path: str
     score: float
     text: str
+
+
+def _load_chunk_text_by_id(chunks_root: Path, *, scheme_id: str, chunk_id: str) -> str | None:
+    p = chunks_root / scheme_id / "chunks.jsonl"
+    if not p.is_file():
+        return None
+    with p.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("chunk_id") == chunk_id:
+                t = obj.get("text")
+                return str(t) if isinstance(t, str) else None
+    return None
+
+
+@lru_cache(maxsize=4)
+def _load_faiss_index(index_dir: str) -> tuple[object, list[dict[str, Any]], int]:
+    """
+    Load FAISS index + row metadata.
+    Cached by index_dir string path.
+    """
+    try:
+        import faiss  # type: ignore
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(f"faiss import failed: {e}") from e
+
+    idx_path = Path(index_dir) / "index.faiss"
+    meta_path = Path(index_dir) / "meta.jsonl"
+    index_meta_path = Path(index_dir) / "index_meta.json"
+    if not idx_path.is_file():
+        raise FileNotFoundError(f"Missing FAISS index: {idx_path}")
+    if not meta_path.is_file():
+        raise FileNotFoundError(f"Missing FAISS meta: {meta_path}")
+    index = faiss.read_index(str(idx_path))
+    meta: list[dict[str, Any]] = []
+    with meta_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            meta.append(json.loads(line))
+
+    dim = 768
+    if index_meta_path.is_file():
+        try:
+            im = json.loads(index_meta_path.read_text(encoding="utf-8"))
+            v = im.get("embedding_dim")
+            if isinstance(v, int) and v > 0:
+                dim = v
+        except Exception:
+            pass
+
+    return index, meta, dim
+
+
+def retrieve_faiss(
+    *,
+    chunks_root: Path,
+    index_dir: Path,
+    query: str,
+    top_k: int = 5,
+    scheme_filter: set[str] | None = None,
+    search_k: int | None = None,
+) -> list[ChunkHit]:
+    """
+    Vector retrieval via FAISS.
+    Uses the same Phase 1.4 hash embedder (L2-normalized), and IndexFlatIP.
+    """
+    try:
+        import numpy as np  # type: ignore
+        from ingestion.phase1.subphase_1_4_embed.hash_embedder import hash_embed_to_float32_bytes
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(f"missing vector deps: {e}") from e
+
+    index, meta_rows, dim = _load_faiss_index(str(index_dir))
+    q_bytes = hash_embed_to_float32_bytes(query, dim=dim, salt=f"groww_rag_hash_v1_dim={dim}")
+    q = np.frombuffer(q_bytes, dtype=np.float32).reshape(1, dim)
+
+    # Search more than top_k if scheme_filter is applied, then filter down.
+    if search_k is None:
+        search_k = max(top_k * 8, top_k)
+    scores, idxs = index.search(q, int(search_k))
+    out: list[ChunkHit] = []
+
+    for score, row_idx in zip(scores[0].tolist(), idxs[0].tolist()):
+        if row_idx < 0 or row_idx >= len(meta_rows):
+            continue
+        m = meta_rows[row_idx]
+        scheme_id = str(m.get("scheme_id") or "")
+        if scheme_filter and scheme_id not in scheme_filter:
+            continue
+        chunk_id = str(m.get("chunk_id") or "")
+        if not scheme_id or not chunk_id:
+            continue
+        text = _load_chunk_text_by_id(chunks_root, scheme_id=scheme_id, chunk_id=chunk_id)
+        if not text:
+            continue
+        out.append(
+            ChunkHit(
+                chunk_id=chunk_id,
+                scheme_id=scheme_id,
+                source_url=str(m.get("source_url") or ""),
+                doc_type=str(m.get("doc_type") or ""),
+                section_path=str(m.get("section_path") or ""),
+                score=float(score),
+                text=text,
+            )
+        )
+        if len(out) >= top_k:
+            break
+
+    return out
 
 
 def iter_chunks(chunks_root: Path, *, scheme_ids: set[str] | None = None) -> Iterable[dict[str, Any]]:
@@ -135,10 +254,64 @@ def retrieve(
     query: str,
     top_k: int = 5,
     scheme_filter: set[str] | None = None,
+    faiss_index_dir: Path | None = None,
 ) -> list[ChunkHit]:
     nq = normalize_query(query)
     q_tokens = _tokenize(nq)
     intent = infer_intent_fields(nq)
+
+    def score_hit_text(text: str, section_path: str) -> float:
+        base = lexical_score(text, q_tokens)
+        sp = (section_path or "").lower()
+        boost = section_boost(sp, intent)
+        tl = text.lower()
+        for f in intent:
+            if f"{f}:" in tl:
+                boost += 4.0
+        if "fund_manager" in intent and "fund_manager:" in tl:
+            boost += 20.0
+        if "expense_ratio" in intent and "expense_ratio:" in tl:
+            boost += 20.0
+            if "historic" in sp:
+                boost -= 8.0
+        if "exit_load" in intent and "exit_load:" in tl:
+            boost += 20.0
+        for k in intent:
+            if re.search(rf"(?m)^{re.escape(k)}:", text):
+                boost += 30.0
+        return base + boost
+
+    # If FAISS index exists, use it to shortlist candidates, then re-rank using lexical/intent scoring.
+    if faiss_index_dir is not None:
+        try:
+            if (faiss_index_dir / "index.faiss").is_file():
+                cand = retrieve_faiss(
+                    chunks_root=chunks_root,
+                    index_dir=faiss_index_dir,
+                    query=query,
+                    top_k=max(top_k * 10, top_k),
+                    scheme_filter=scheme_filter,
+                    search_k=max(top_k * 50, top_k),
+                )
+                if cand:
+                    reranked: list[ChunkHit] = []
+                    for h in cand:
+                        s = score_hit_text(h.text, h.section_path) + (0.25 * float(h.score))
+                        reranked.append(
+                            ChunkHit(
+                                chunk_id=h.chunk_id,
+                                scheme_id=h.scheme_id,
+                                source_url=h.source_url,
+                                doc_type=h.doc_type,
+                                section_path=h.section_path,
+                                score=s,
+                                text=h.text,
+                            )
+                        )
+                    reranked.sort(key=lambda h: h.score, reverse=True)
+                    return reranked[: max(1, top_k)]
+        except Exception:
+            pass
 
     def row_matches_intent(row: dict[str, Any]) -> bool:
         if not intent:
@@ -151,29 +324,8 @@ def retrieve(
 
     def score_row(row: dict[str, Any]) -> float:
         text = str(row.get("text") or "")
-        base = lexical_score(text, q_tokens)
-        sp = str(row.get("section_path") or "").lower()
-        boost = section_boost(sp, intent)
-        # extra boost if exact structured key appears (helps key/value queries)
-        tl = text.lower()
-        for f in intent:
-            if f"{f}:" in tl:
-                boost += 4.0
-        # Strong preference for canonical single-value keys when present
-        if "fund_manager" in intent and "fund_manager:" in tl:
-            boost += 20.0
-        if "expense_ratio" in intent and "expense_ratio:" in tl:
-            boost += 20.0
-            # Prefer the canonical current value over historic series when possible
-            if "historic" in sp:
-                boost -= 8.0
-        if "exit_load" in intent and "exit_load:" in tl:
-            boost += 20.0
-        # Strong boost when the *requested* canonical key appears at start-of-line
-        for k in intent:
-            if re.search(rf"(?m)^{re.escape(k)}:", text):
-                boost += 30.0
-        return base + boost
+        sp = str(row.get("section_path") or "")
+        return score_hit_text(text, sp)
 
     # If scheme-filtered and we have a clear intent (exit_load, expense_ratio, etc.),
     # prefer intent-matching chunks first; fallback to general lexical if no hit.

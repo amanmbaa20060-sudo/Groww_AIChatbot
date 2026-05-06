@@ -92,7 +92,25 @@ def answer_query(
     top_k: int = 5,
     scheme_filter: set[str] | None = None,
 ) -> AnswerResult:
-    hits = retrieve(chunks_root=chunks_root, query=query, top_k=top_k, scheme_filter=scheme_filter)
+    faiss_dir: Path | None = None
+    try:
+        if registry_latest_path.is_file():
+            latest = json.loads(registry_latest_path.read_text(encoding="utf-8"))
+            index_name = latest.get("index_name")
+            if isinstance(index_name, str) and index_name.strip():
+                cand = Path("data/index") / index_name
+                if (cand / "index.faiss").is_file():
+                    faiss_dir = cand
+    except Exception:
+        faiss_dir = None
+
+    hits = retrieve(
+        chunks_root=chunks_root,
+        query=query,
+        top_k=top_k,
+        scheme_filter=scheme_filter,
+        faiss_index_dir=faiss_dir,
+    )
     if not hits:
         # No hit → still return a safe response without fabricating facts.
         last = _load_last_updated(registry_latest_path)

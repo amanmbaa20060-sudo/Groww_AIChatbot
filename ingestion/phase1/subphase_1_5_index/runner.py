@@ -89,6 +89,7 @@ class IndexPaths:
     vectors_f32: Path
     meta_jsonl: Path
     index_meta_json: Path
+    faiss_index: Path
 
 
 def _paths(out_dir: Path, index_name: str) -> IndexPaths:
@@ -98,7 +99,35 @@ def _paths(out_dir: Path, index_name: str) -> IndexPaths:
         vectors_f32=root / "vectors.f32",
         meta_jsonl=root / "meta.jsonl",
         index_meta_json=root / "index_meta.json",
+        faiss_index=root / "index.faiss",
     )
+
+
+def _try_build_faiss_index(*, vectors_f32_path: Path, out_path: Path, rows: int, dim: int) -> tuple[bool, str | None]:
+    """
+    Best-effort FAISS index build.
+    - Uses IndexFlatIP (cosine-like, since vectors are L2-normalized in Phase 1.4).
+    - Writes to out_path.
+    Returns (built, error_message).
+    """
+    try:
+        import numpy as np  # type: ignore
+        import faiss  # type: ignore
+    except Exception as e:  # noqa: BLE001
+        return False, f"faiss unavailable: {e}"
+
+    try:
+        raw = vectors_f32_path.read_bytes()
+        x = np.frombuffer(raw, dtype=np.float32)
+        if x.size != rows * dim:
+            return False, f"vectors size mismatch: got {x.size} floats, expected {rows * dim}"
+        x = x.reshape(rows, dim)
+        index = faiss.IndexFlatIP(dim)
+        index.add(x)
+        faiss.write_index(index, str(out_path))
+        return True, None
+    except Exception as e:  # noqa: BLE001
+        return False, str(e)
 
 
 def _validate_embedding_row(
@@ -205,6 +234,7 @@ def build_index(
     tmp_vectors = tmp_root / "vectors.f32"
     tmp_meta = tmp_root / "meta.jsonl"
     tmp_index_meta = tmp_root / "index_meta.json"
+    tmp_faiss = tmp_root / "index.faiss"
 
     total = 0
     if dry_run:
@@ -256,6 +286,18 @@ def build_index(
         "vectors_file": "vectors.f32",
         "meta_file": "meta.jsonl",
     }
+
+    faiss_built, faiss_err = _try_build_faiss_index(
+        vectors_f32_path=tmp_vectors,
+        out_path=tmp_faiss,
+        rows=total,
+        dim=embedding_dim,
+    )
+    index_meta["faiss_index_file"] = "index.faiss" if faiss_built else None
+    index_meta["faiss_index_type"] = "IndexFlatIP" if faiss_built else None
+    if faiss_err:
+        index_meta["faiss_error"] = faiss_err
+
     _atomic_write_text(tmp_index_meta, json.dumps(index_meta, ensure_ascii=False, indent=2) + "\n")
 
     # Swap tmp_root -> paths.root
