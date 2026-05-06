@@ -3,7 +3,7 @@ services:
     name: groww-rag-backend
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && python -m ingestion.phase1.subphase_1_6_orchestrate --ignore-robots
     startCommand: python -m app.api
     healthCheckPath: /health
     envVars:
