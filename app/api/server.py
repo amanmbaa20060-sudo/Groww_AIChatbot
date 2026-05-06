@@ -64,6 +64,15 @@ def _default_use_groq() -> bool:
 class ApiHandler(BaseHTTPRequestHandler):
     server_version = "GrowwRAGPhase4Backend/0.2"
 
+    def _is_data_ready(self) -> bool:
+        chunks_root = Path("data/chunks")
+        if not chunks_root.exists():
+            return False
+        try:
+            return next(chunks_root.rglob("chunks.jsonl"), None) is not None
+        except Exception:
+            return False
+
     def _text(self, code: int, text: str, *, content_type: str = "text/plain; charset=utf-8") -> None:
         data = text.encode("utf-8")
         self.send_response(code)
@@ -115,7 +124,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         # - /ui/<file>  -> app/ui/<file>
         path = self.path.split("?", 1)[0]
         if path == "/health":
-            return self._json(200, {"ok": True})
+            return self._json(200, {"ok": True, "data_ready": self._is_data_ready()})
         if path == "/" or path == "":
             return self._serve_static(Path("app/ui/index.html"))
         if path in {"/styles.css", "/app.js"}:
@@ -273,7 +282,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         )
 
 
-def serve(host: str = "127.0.0.1", port: int | None = None) -> None:
+def serve(host: str = "0.0.0.0", port: int | None = None) -> None:
     _load_dotenv(Path(".env"))
     if port is None:
         # Prefer env PORT if provided; otherwise pick a high default to avoid Windows restrictions.
