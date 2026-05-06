@@ -54,10 +54,15 @@ async function submitQuery(q) {
     const answerText = data.answer_text || "No response.";
     const cite = data.citation_url;
     const last = data.last_updated_from_sources_utc;
+    const llmErr = data.llm_error;
+    const groqModel = data.groq_model;
 
     let meta = `<b>${label}</b>`;
     if (data.llm_used) {
       meta += ` — <b>LLM</b>`;
+    }
+    if (groqModel) {
+      meta += ` — Model: <code>${groqModel}</code>`;
     }
     if (cite) {
       const safeUrl = String(cite);
@@ -65,6 +70,9 @@ async function submitQuery(q) {
     }
     if (last) {
       meta += `<br/>Last updated from sources: <b>${last}</b>`;
+    }
+    if (llmErr) {
+      meta += `<br/>LLM error: <code>${String(llmErr)}</code>`;
     }
 
     appendMessage({ role: "assistant", text: answerText, metaHtml: meta });

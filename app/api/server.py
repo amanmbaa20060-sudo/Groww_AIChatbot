@@ -61,6 +61,10 @@ def _default_use_groq() -> bool:
     return bool(os.getenv("GROQ_API_KEY", "").strip())
 
 
+def _default_groq_model() -> str:
+    return str(os.getenv("GROQ_MODEL") or "llama-3.1-8b-instant")
+
+
 class ApiHandler(BaseHTTPRequestHandler):
     server_version = "GrowwRAGPhase4Backend/0.2"
 
@@ -124,7 +128,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         # - /ui/<file>  -> app/ui/<file>
         path = self.path.split("?", 1)[0]
         if path == "/health":
-            return self._json(200, {"ok": True, "data_ready": self._is_data_ready()})
+            return self._json(
+                200,
+                {
+                    "ok": True,
+                    "data_ready": self._is_data_ready(),
+                    "groq_configured": _default_use_groq(),
+                    "groq_model_default": _default_groq_model(),
+                },
+            )
         if path == "/" or path == "":
             return self._serve_static(Path("app/ui/index.html"))
         if path in {"/styles.css", "/app.js"}:
@@ -248,7 +260,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             use_groq = bool(req.get("use_groq"))
         else:
             use_groq = _default_use_groq()
-        groq_model = str(req.get("groq_model") or os.getenv("GROQ_MODEL") or "llama-3.1-8b-instant")
+        groq_model = str(req.get("groq_model") or _default_groq_model())
 
         chunks_root = Path("data/chunks")
         latest_batch = Path("data/registry/latest_batch.json")
@@ -278,6 +290,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "last_updated_from_sources_utc": last if citation_url else None,
                 "llm_used": bool(r.llm_used),
                 "llm_error": r.llm_error if not r.llm_used else None,
+                "groq_model": groq_model if use_groq else None,
             },
         )
 
