@@ -3,11 +3,16 @@ services:
     name: groww-rag-backend
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt && python -m ingestion.phase1.subphase_1_6_orchestrate --ignore-robots
+    # If `data/` is committed (this repo), prefer the snapshot to keep builds fast/reliable.
+    # Only run ingestion when index artifacts are missing.
+    buildCommand: pip install -r requirements.txt && python scripts/validate_manifest.py && (test -f data/index/groww_hash_v1_dim768/index.faiss || python -m ingestion.phase1.subphase_1_6_orchestrate --ignore-robots)
     startCommand: python -m app.api
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
         value: llama-3.1-8b-instant
+      - key: USE_GROQ_DEFAULT
+        value: "0"
