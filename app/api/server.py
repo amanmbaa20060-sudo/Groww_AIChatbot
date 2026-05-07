@@ -12,6 +12,8 @@ Request JSON:
     "groq_model": "llama-3.1-8b-instant"
   }
 
+Default use_groq is false (verbatim grounded lines). Set USE_GROQ_DEFAULT=1 to default true when GROQ_API_KEY is set.
+
 Response JSON:
   {
     "label": "FACTUAL_MF|ADVISORY|...|UNKNOWN",
@@ -35,6 +37,45 @@ from pathlib import Path
 from typing import Any
 
 from app.guardrails.phase3 import QueryLabel, run_phase3_structured
+from app.corpus.manifest import allowlisted_schemes
+
+
+_SCHEME_TOKEN_STOP = frozenset({"hdfc", "fund", "direct", "growth", "plan", "of", "and", "the"})
+
+
+def _infer_scheme_filter_from_query(*, query: str, chunks_root: Path) -> set[str] | None:
+    """
+    If the client doesn't pass scheme_ids, infer the most likely scheme_id from the question.
+    This prevents cross-scheme leakage (wrong facts + wrong citation URL) for scheme-specific questions.
+    """
+    q = (query or "").lower()
+    q_tokens = set(re.findall(r"[a-z0-9]+", q))
+    if not q_tokens:
+        return None
+
+    best_score = 0
+    best: list[str] = []
+    try:
+        scheme_dirs = [p for p in chunks_root.iterdir() if p.is_dir()]
+    except Exception:
+        return None
+
+    for p in scheme_dirs:
+        sid = p.name
+        parts = [t for t in re.findall(r"[a-z0-9]+", sid.lower()) if t and t not in _SCHEME_TOKEN_STOP]
+        if not parts:
+            continue
+        score = sum(1 for t in parts if t in q_tokens)
+        if score > best_score:
+            best_score = score
+            best = [sid]
+        elif score == best_score and score > 0:
+            best.append(sid)
+
+    # Require at least 2 matching tokens to avoid accidental matches.
+    if best_score >= 2 and best:
+        return {best[0]}
+    return None
 
 
 def _load_dotenv(dotenv_path: Path) -> None:
@@ -56,9 +97,17 @@ def _load_dotenv(dotenv_path: Path) -> None:
             os.environ[k] = v
 
 
-def _default_use_groq() -> bool:
-    # Prefer Groq for response generation when configured.
+def _groq_api_configured() -> bool:
     return bool(os.getenv("GROQ_API_KEY", "").strip())
+
+
+def _default_use_groq() -> bool:
+    # Factual answers use verbatim corpus lines by default; Groq can rephrase and introduce errors.
+    # Opt in per request with `"use_groq": true` or set USE_GROQ_DEFAULT=1 in the environment.
+    v = (os.getenv("USE_GROQ_DEFAULT") or "").strip().lower()
+    if v in {"1", "true", "yes", "on"}:
+        return _groq_api_configured()
+    return False
 
 
 def _default_groq_model() -> str:
@@ -122,6 +171,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         # GET routes:
         # - /health     -> JSON status
+        # - /schemes    -> JSON allowlisted schemes (Phase 0)
         # - /           -> app/ui/index.html
         # - /styles.css -> app/ui/styles.css
         # - /app.js     -> app/ui/app.js
@@ -133,8 +183,18 @@ class ApiHandler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "data_ready": self._is_data_ready(),
-                    "groq_configured": _default_use_groq(),
+                    "llm_provider": "groq",
+                    "groq_configured": _groq_api_configured(),
+                    "groq_default_on": _default_use_groq(),
                     "groq_model_default": _default_groq_model(),
+                },
+            )
+        if path == "/schemes":
+            # UI helper for Phase 4: list schemes for selection; no secrets.
+            return self._json(
+                200,
+                {
+                    "schemes": allowlisted_schemes(),
                 },
             )
         if path == "/" or path == "":
@@ -264,6 +324,9 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         chunks_root = Path("data/chunks")
         latest_batch = Path("data/registry/latest_batch.json")
+
+        if scheme_filter is None:
+            scheme_filter = _infer_scheme_filter_from_query(query=query, chunks_root=chunks_root)
 
         r = run_phase3_structured(
             query=query,

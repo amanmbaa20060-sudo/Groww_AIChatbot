@@ -37,10 +37,10 @@ async function submitQuery(q) {
 
   appendMessage({ role: "user", text: q });
 
-  const body = {
-    query: q,
-    use_groq: true,
-  };
+  const schemeId = (el("schemeSelect") && el("schemeSelect").value) || "";
+  const body = { query: q };
+  // Include scheme_ids only when user picked a scheme explicitly.
+  if (schemeId) body.scheme_ids = [schemeId];
 
   try {
     const resp = await fetch(`${backendUrl}/query`, {
@@ -103,10 +103,30 @@ function wireComposer() {
   });
 }
 
+async function loadSchemes() {
+  const sel = el("schemeSelect");
+  if (!sel) return;
+  try {
+    const resp = await fetch(`${backendUrl}/schemes`);
+    const data = await resp.json();
+    const schemes = (data && data.schemes) || [];
+    for (const s of schemes) {
+      if (!s || !s.scheme_id || !s.display_name) continue;
+      const opt = document.createElement("option");
+      opt.value = String(s.scheme_id);
+      opt.textContent = String(s.display_name);
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    // If the endpoint isn't available, keep the select as "Auto".
+  }
+}
+
 function init() {
   el("backendUrl").textContent = backendUrl;
   wireExamples();
   wireComposer();
+  loadSchemes();
   appendMessage({
     role: "assistant",
     text: "Ask a factual question about one of the 17 schemes (expense_ratio, exit_load, benchmark, fund_manager, etc.).",

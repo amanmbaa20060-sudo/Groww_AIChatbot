@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+from app.corpus.manifest import allowlisted_scheme_urls
 
 _TOKEN_RE = re.compile(r"[a-z0-9_]+")
 _CANONICAL_KEY_LINE = re.compile(r"(?m)^(exit_load|expense_ratio|fund_manager|benchmark_name|benchmark|aum|nav|tax_impact):")
@@ -32,6 +33,12 @@ def normalize_query(q: str) -> str:
     # small, explicit synonym map (rules only)
     ql = ql.replace("ter", "expense ratio")
     ql = ql.replace("exitload", "exit load")
+    # Align phrasing with corpus key `nav:` (often stored far from other scheme fields)
+    ql = re.sub(r"\bnet\s+asset\s+value\b", "nav", ql)
+    ql = re.sub(r"\blatest\s+nav\b", "nav", ql)
+    # Lock-in phrasing (ELSS)
+    ql = re.sub(r"\block[-\s]?in\s+period\b", "lock_in", ql)
+    ql = re.sub(r"\block[-\s]?in\b", "lock_in", ql)
     # prefer underscore form to match flattened mfServerSideData keys
     ql = ql.replace("exit load", "exit_load")
     ql = ql.replace("expense ratio", "expense_ratio")
@@ -50,15 +57,27 @@ def infer_intent_fields(q: str) -> set[str]:
     if "benchmark" in ql:
         out.add("benchmark")
         out.add("benchmark_name")
-    if "fund_manager" in ql or "fund manager" in ql or "manager" in ql:
+    # Avoid matching generic "manager" (e.g. "asset management company"); rely on fund-manager wording.
+    if (
+        "fund_manager" in ql
+        or re.search(r"\bfund\s+manager\b", ql)
+        or re.search(r"\bwho\s+manages\b", ql)
+        or re.search(r"\bportfolio\s+manager\b", ql)
+    ):
         out.add("fund_manager")
-        out.add("fund_manager_details")
     if "tax" in ql:
         out.add("tax_impact")
+        out.add("category_info.tax_impact")
     if "aum" in ql:
         out.add("aum")
-    if "nav" in ql:
+    # Word-boundary NAV only (avoid matching inside unrelated tokens).
+    if re.search(r"\bnav\b", ql):
         out.add("nav")
+        out.add("nav_date")
+    # Lock-in (ELSS): support both flattened and non-flattened keys present in chunks.
+    if "lock_in" in ql or re.search(r"\block\s*in\b", ql):
+        out.add("additional_details.lock_in_yrs")
+        out.add("lock_in.years")
     return out
 
 
@@ -276,42 +295,12 @@ def retrieve(
                 boost -= 8.0
         if "exit_load" in intent and "exit_load:" in tl:
             boost += 20.0
+        if "nav" in intent and re.search(r"(?m)^nav:\s*\S", text):
+            boost += 25.0
         for k in intent:
             if re.search(rf"(?m)^{re.escape(k)}:", text):
                 boost += 30.0
         return base + boost
-
-    # If FAISS index exists, use it to shortlist candidates, then re-rank using lexical/intent scoring.
-    if faiss_index_dir is not None:
-        try:
-            if (faiss_index_dir / "index.faiss").is_file():
-                cand = retrieve_faiss(
-                    chunks_root=chunks_root,
-                    index_dir=faiss_index_dir,
-                    query=query,
-                    top_k=max(top_k * 10, top_k),
-                    scheme_filter=scheme_filter,
-                    search_k=max(top_k * 50, top_k),
-                )
-                if cand:
-                    reranked: list[ChunkHit] = []
-                    for h in cand:
-                        s = score_hit_text(h.text, h.section_path) + (0.25 * float(h.score))
-                        reranked.append(
-                            ChunkHit(
-                                chunk_id=h.chunk_id,
-                                scheme_id=h.scheme_id,
-                                source_url=h.source_url,
-                                doc_type=h.doc_type,
-                                section_path=h.section_path,
-                                score=s,
-                                text=h.text,
-                            )
-                        )
-                    reranked.sort(key=lambda h: h.score, reverse=True)
-                    return reranked[: max(1, top_k)]
-        except Exception:
-            pass
 
     def row_matches_intent(row: dict[str, Any]) -> bool:
         if not intent:
@@ -327,26 +316,32 @@ def retrieve(
         sp = str(row.get("section_path") or "")
         return score_hit_text(text, sp)
 
-    # If scheme-filtered and we have a clear intent (exit_load, expense_ratio, etc.),
-    # prefer intent-matching chunks first; fallback to general lexical if no hit.
+    # Phase 2 strategy (docs §5.1): lexical-first, optional vector rerank.
+    # Keep k small to reduce contradictions.
+    allowed_urls = allowlisted_scheme_urls()
+
     candidates = list(iter_chunks(chunks_root, scheme_ids=scheme_filter))
+    # If we have a clear intent (exit_load, expense_ratio, lock-in, etc.), prefer intent-matching rows first.
     primary = [r for r in candidates if row_matches_intent(r)]
     if primary:
         candidates = primary
 
-    hits: list[ChunkHit] = []
+    lexical_hits: list[ChunkHit] = []
     for row in candidates:
         text = str(row.get("text") or "")
         if not text:
             continue
+        source_url = str(row.get("source_url") or "")
+        if allowed_urls and source_url not in allowed_urls:
+            continue
         score = score_row(row)
         if score <= 0.0:
             continue
-        hits.append(
+        lexical_hits.append(
             ChunkHit(
                 chunk_id=str(row["chunk_id"]),
                 scheme_id=str(row["scheme_id"]),
-                source_url=str(row["source_url"]),
+                source_url=source_url,
                 doc_type=str(row.get("doc_type") or ""),
                 section_path=str(row.get("section_path") or ""),
                 score=score,
@@ -354,6 +349,47 @@ def retrieve(
             )
         )
 
-    hits.sort(key=lambda h: h.score, reverse=True)
-    return hits[: max(1, top_k)]
+    lexical_hits.sort(key=lambda h: h.score, reverse=True)
+    lexical_top = lexical_hits[: max(25, top_k * 10)]
+
+    # Optional vector rerank (later hybrid): lexical top-N union FAISS top-M.
+    if faiss_index_dir is not None and (faiss_index_dir / "index.faiss").is_file():
+        try:
+            faiss_cand = retrieve_faiss(
+                chunks_root=chunks_root,
+                index_dir=faiss_index_dir,
+                query=query,
+                top_k=max(25, top_k * 10),
+                scheme_filter=scheme_filter,
+                search_k=max(200, top_k * 50),
+            )
+        except Exception:
+            faiss_cand = []
+
+        merged: dict[str, ChunkHit] = {h.chunk_id: h for h in lexical_top}
+        for h in faiss_cand:
+            if allowed_urls and h.source_url not in allowed_urls:
+                continue
+            if h.chunk_id not in merged:
+                merged[h.chunk_id] = h
+
+        reranked: list[ChunkHit] = []
+        for h in merged.values():
+            # Re-score using lexical/intent and add a small contribution from FAISS similarity (if present).
+            s = score_hit_text(h.text, h.section_path) + (0.25 * float(h.score))
+            reranked.append(
+                ChunkHit(
+                    chunk_id=h.chunk_id,
+                    scheme_id=h.scheme_id,
+                    source_url=h.source_url,
+                    doc_type=h.doc_type,
+                    section_path=h.section_path,
+                    score=s,
+                    text=h.text,
+                )
+            )
+        reranked.sort(key=lambda h: h.score, reverse=True)
+        return reranked[: max(1, top_k)]
+
+    return lexical_top[: max(1, top_k)]
 

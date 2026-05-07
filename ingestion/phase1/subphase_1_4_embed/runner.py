@@ -119,7 +119,9 @@ def embed_scheme(
 
     wrote = 0
     skipped = 0
-    with out_path.open("a", encoding="utf-8") as out_f:
+    # Full rebuild must truncate; append-only would duplicate rows or keep stale vectors for unchanged chunk_ids.
+    out_mode = "a" if resume else "w"
+    with out_path.open(out_mode, encoding="utf-8") as out_f:
         for row in _iter_jsonl(in_path):
             _validate_chunk_row(row, scheme_id=scheme_id, allowed_url=allowed_url)
             cid = row["chunk_id"]

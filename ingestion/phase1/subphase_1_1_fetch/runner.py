@@ -83,8 +83,11 @@ def _robots_allows(url: str, ua: str) -> bool:
         return True
 
 
-def _fetch_once(url: str, timeout: float) -> tuple[int, bytes, Message, str]:
-    req = Request(url, headers={"User-Agent": USER_AGENT}, method="GET")
+def _fetch_once(url: str, timeout: float, *, extra_headers: dict[str, str] | None = None) -> tuple[int, bytes, Message, str]:
+    headers = {"User-Agent": USER_AGENT}
+    if extra_headers:
+        headers.update(extra_headers)
+    req = Request(url, headers=headers, method="GET")
     with urlopen(req, timeout=timeout) as resp:  # noqa: S310
         body = resp.read()
         status = getattr(resp, "status", 200)
@@ -98,11 +101,12 @@ def fetch_url(
     *,
     timeout: float,
     max_retries: int,
+    extra_headers: dict[str, str] | None = None,
 ) -> tuple[bool, int | None, bytes | None, Message | None, str | None, str | None]:
     last_err: str | None = None
     for attempt in range(max_retries):
         try:
-            status, body, headers, final = _fetch_once(url, timeout)
+            status, body, headers, final = _fetch_once(url, timeout, extra_headers=extra_headers)
             if status in RETRYABLE_HTTP and attempt < max_retries - 1:
                 wait = min(2**attempt, 16)
                 LOGGER.warning("HTTP %s for %s; retry in %ss", status, url, wait)
@@ -113,6 +117,9 @@ def fetch_url(
             return True, status, body, headers, final, None
         except HTTPError as e:
             code = e.code
+            if code == 304:
+                # Not modified: treat as success; caller should keep existing body cache.
+                return True, 304, b"", e.headers, url, None
             if code in RETRYABLE_HTTP and attempt < max_retries - 1:
                 wait = min(2**attempt, 16)
                 LOGGER.warning("HTTPError %s for %s; retry in %ss", code, url, wait)
@@ -207,17 +214,37 @@ def fetch_all(
             )
             continue
 
+        # Best-effort conditional GET to reduce churn (ETag / Last-Modified).
+        conditional: dict[str, str] = {}
+        try:
+            if headers_path.is_file():
+                prev = json.loads(headers_path.read_text(encoding="utf-8"))
+                et = prev.get("etag")
+                lm = prev.get("last-modified")
+                if isinstance(et, str) and et.strip():
+                    conditional["If-None-Match"] = et.strip()
+                if isinstance(lm, str) and lm.strip():
+                    conditional["If-Modified-Since"] = lm.strip()
+        except Exception:
+            conditional = {}
+
         ok, status, body, hdrs, final_url, err = fetch_url(
-            t.groww_scheme_url, timeout=timeout, max_retries=max_retries
+            t.groww_scheme_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            extra_headers=conditional or None,
         )
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        if ok and body is not None and hdrs is not None and status is not None:
-            _atomic_write_bytes(body_path, body)
+        if ok and hdrs is not None and status is not None:
+            if status != 304 and body is not None:
+                _atomic_write_bytes(body_path, body)
             meta = _headers_to_store(hdrs, final_url or t.groww_scheme_url, status)
             meta["fetched_at_utc"] = now
             meta["request_url"] = t.groww_scheme_url
             meta["scheme_id"] = t.scheme_id
+            if conditional:
+                meta["conditional_request_headers"] = conditional
             _atomic_write_json(headers_path, meta)
             if error_path.exists():
                 error_path.unlink(missing_ok=True)
@@ -228,11 +255,14 @@ def fetch_all(
                     True,
                     status,
                     None,
-                    len(body),
+                    0 if status == 304 else (len(body) if body is not None else None),
                     out_sub,
                 )
             )
-            LOGGER.info("OK %s (%s bytes, HTTP %s)", t.scheme_id, len(body), status)
+            if status == 304:
+                LOGGER.info("OK %s (not modified, HTTP 304)", t.scheme_id)
+            else:
+                LOGGER.info("OK %s (%s bytes, HTTP %s)", t.scheme_id, len(body or b""), status)
         else:
             _atomic_write_json(
                 error_path,

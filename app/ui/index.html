@@ -10,17 +10,25 @@
     <div class="app">
       <header class="header">
         <div class="title">Groww Mutual Fund FAQ Assistant</div>
-        <div class="subtitle">Facts-only. Closed corpus (17 Groww scheme pages). No investment advice.</div>
+        <div class="subtitle">Facts-only. Closed corpus (17 Groww scheme pages). No investment advice. LLM provider: Groq (optional).</div>
       </header>
 
       <section class="card">
         <div class="cardTitle">Try an example</div>
+        <div class="row" style="margin-bottom: 10px;">
+          <div class="label">Scheme (optional)</div>
+          <select id="schemeSelect" class="select" aria-label="Select a scheme">
+            <option value="">Auto-detect from question</option>
+          </select>
+        </div>
         <div class="examples" id="examples">
           <button class="chip" data-q="What is the exit load?">Exit load</button>
           <button class="chip" data-q="What is the expense ratio?">Expense ratio</button>
           <button class="chip" data-q="What is the ELSS lock-in?">ELSS lock-in</button>
         </div>
         <div class="disclaimer" role="note">
+          <b>Facts-only. No investment advice.</b>
+          <br />
           Privacy: Don’t share PAN, Aadhaar, OTP, bank details, phone, email, or transaction/portfolio details.
         </div>
       </section>

@@ -161,7 +161,12 @@ def run_pipeline(args: argparse.Namespace) -> int:
 
     if not args.skip_1_4:
         LOGGER.info("Running 1.4 embed...")
-        rc = embed_main(["--manifest", str(args.manifest), "--resume"])
+        # Do not pass --resume by default: after 1.3 re-chunk, chunk text can change while chunk_id stays
+        # the same; resume would skip re-embed and leave vectors misaligned with chunks (wrong retrieval).
+        embed_argv = ["--manifest", str(args.manifest)]
+        if args.embed_resume:
+            embed_argv.append("--resume")
+        rc = embed_main(embed_argv)
         if rc != 0:
             return rc
 
@@ -223,6 +228,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument("--skip-1-5", action="store_true", help="Skip subphase 1.5 index")
 
     p.add_argument("--ignore-robots", action="store_true", help="Pass --ignore-robots to 1.1 (policy-dependent)")
+    p.add_argument(
+        "--embed-resume",
+        action="store_true",
+        help="Pass --resume to 1.4 (only new chunk_ids; unsafe after 1.3 text changes)",
+    )
 
     # Index parameters (must match 1.4/1.5 defaults unless overridden)
     p.add_argument("--index-name", default="groww_hash_v1_dim768", help="Index name under data/index/")

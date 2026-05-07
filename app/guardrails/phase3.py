@@ -14,7 +14,9 @@ from enum import Enum
 from pathlib import Path
 
 from app.rag.answer import AnswerResult, answer_query
+from app.rag.retrieval import infer_intent_fields, normalize_query
 from app.llm.groq_chat import GroqError, groq_chat_completion
+from app.corpus.manifest import allowlisted_schemes, is_allowlisted_url
 
 
 class QueryLabel(str, Enum):
@@ -114,6 +116,36 @@ def classify_query(q: str) -> QueryLabel:
     return QueryLabel.FACTUAL_MF
 
 
+def _needs_scheme_clarification(*, query: str, scheme_filter: set[str] | None) -> bool:
+    """
+    Phase 3 (docs §6.1): if the query is factual but scheme is ambiguous, ask for clarification
+    without emitting any URL.
+    """
+    if scheme_filter:
+        return False
+
+    nq = normalize_query(query)
+    intent = infer_intent_fields(nq)
+    if not intent:
+        return False
+
+    ql = nq.lower()
+    # If the user signals it's a general question, don't force clarification.
+    if re.search(r"\b(any|which fund|which scheme|this fund|this scheme)\b", ql):
+        return False
+
+    # If the query includes a recognizable slug token, assume a scheme is specified.
+    for s in allowlisted_schemes():
+        slug = s.get("slug", "")
+        if not slug:
+            continue
+        tokens = [t for t in re.findall(r"[a-z0-9]+", slug.lower()) if len(t) >= 4]
+        if any(t in ql for t in tokens):
+            return False
+
+    return True
+
+
 def run_phase3(
     *,
     query: str,
@@ -157,6 +189,21 @@ def run_phase3_structured(
             answer_text=(
                 "I can’t help with requests that include or ask for personal/account details (PAN/Aadhaar/OTP/bank/contact info). "
                 "Please remove any personal information and ask a general, factual question about the schemes."
+            ),
+            citation_url=None,
+            last_updated_utc_date=None,
+            llm_used=False,
+            llm_error=None,
+        )
+
+    if label == QueryLabel.FACTUAL_MF and _needs_scheme_clarification(query=query, scheme_filter=scheme_filter):
+        examples = [s.get("display_name", "") for s in allowlisted_schemes()[:5] if s.get("display_name")]
+        ex_txt = "; ".join(examples) if examples else "one of the 17 schemes in this project"
+        return GuardrailStructured(
+            label=QueryLabel.AMBIGUOUS,
+            answer_text=(
+                "Which scheme are you asking about? Please specify the fund name (or pass `scheme_ids`). "
+                f"Examples: {ex_txt}."
             ),
             citation_url=None,
             last_updated_utc_date=None,
@@ -215,10 +262,19 @@ def run_phase3_structured(
             llm_used=False,
             llm_error=None,
         )
+    # Phase 0 enforcement (defense in depth): never return citations outside manifest allowlist.
+    if not is_allowlisted_url(res.citation_url):
+        return GuardrailStructured(
+            label=QueryLabel.UNKNOWN,
+            answer_text="I couldn’t find that information in the indexed corpus.",
+            citation_url=None,
+            last_updated_utc_date=res.last_updated_utc_date,
+            llm_used=False,
+            llm_error=None,
+        )
 
-    if use_groq:
-        # For PERSONAL_INFO/UNKNOWN/OUT_OF_SCOPE we already returned above, so here we may safely generate.
-        # Ground using the most relevant retrieved snippet(s) but keep it small.
+    if use_groq and not res.used_canonical_extraction:
+        # LLM paraphrasing can distort numbers/names; skip when we already have verbatim `key: value` lines.
         snippet = "\n".join([h.text[:800] for h in res.hits[:2]])
         try:
             ans_text = _groq_generate_answer_text(

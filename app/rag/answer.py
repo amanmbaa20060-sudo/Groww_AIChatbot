@@ -16,9 +16,199 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from app.rag.retrieval import ChunkHit, infer_intent_fields, normalize_query, retrieve
+from app.rag.retrieval import ChunkHit, infer_intent_fields, iter_chunks, normalize_query, retrieve
 
 _LINE_SPLIT = re.compile(r"\r?\n")
+_NAV_KEY_LINE = re.compile(r"(?m)^nav:\s*\S")
+_EXPENSE_RATIO_KEY_LINE = re.compile(r"(?m)^expense_ratio:\s*\S")
+_EXIT_LOAD_KEY_LINE = re.compile(r"(?m)^exit_load:\s*\S")
+_LOCK_IN_YEARS_KEY_LINE = re.compile(r"(?m)^(additional_details\.lock_in_yrs|lock_in\.years):\s*\S")
+
+# Nested / noisy keys: use for retrieval boosts elsewhere, but not for verbatim answer lines
+# (e.g. fund_manager_details lists many person_name rows; top-level fund_manager is authoritative).
+_EXTRACTION_SKIP_KEYS = frozenset({"fund_manager_details"})
+
+
+def _extraction_intent_keys(intent: set[str]) -> set[str]:
+    return {k for k in intent if k not in _EXTRACTION_SKIP_KEYS}
+
+
+def _primary_intent_keys(intent: set[str]) -> list[str]:
+    """
+    Phase 2: return only the single requested field when possible.
+    Prefer canonical top-level keys over nested/auxiliary keys.
+    """
+    # Most specific / most commonly asked
+    if "expense_ratio" in intent:
+        return ["expense_ratio"]
+    if "exit_load" in intent:
+        return ["exit_load"]
+    if "fund_manager" in intent:
+        return ["fund_manager"]
+    if "benchmark_name" in intent:
+        return ["benchmark_name"]
+    if "benchmark" in intent:
+        return ["benchmark"]
+    # NAV: keep nav_date inline as supporting context (still one line output).
+    if "nav" in intent:
+        return ["nav", "nav_date"] if "nav_date" in intent else ["nav"]
+    # Lock-in: prefer lock_in.years (cleaner), otherwise additional_details.lock_in_yrs.
+    if "lock_in.years" in intent:
+        return ["lock_in.years"]
+    if "additional_details.lock_in_yrs" in intent:
+        return ["additional_details.lock_in_yrs"]
+    # Tax: prefer category_info.tax_impact if present in intent
+    if "category_info.tax_impact" in intent:
+        return ["category_info.tax_impact"]
+    if "tax_impact" in intent:
+        return ["tax_impact"]
+    # AUM
+    if "aum" in intent:
+        return ["aum"]
+    return sorted(_extraction_intent_keys(intent), key=len, reverse=True)
+
+
+def _hits_include_nav_line(hits: list[ChunkHit]) -> bool:
+    return any(_NAV_KEY_LINE.search(h.text) for h in hits)
+
+
+def _hits_include_expense_ratio_line(hits: list[ChunkHit]) -> bool:
+    return any(_EXPENSE_RATIO_KEY_LINE.search(h.text) for h in hits)
+
+
+def _hits_include_exit_load_line(hits: list[ChunkHit]) -> bool:
+    return any(_EXIT_LOAD_KEY_LINE.search(h.text) for h in hits)
+
+
+def _hits_include_lock_in_line(hits: list[ChunkHit]) -> bool:
+    return any(_LOCK_IN_YEARS_KEY_LINE.search(h.text) for h in hits)
+
+
+def _first_chunk_hit_with_nav(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    """
+    NAV often lives only in a late `meta_desc` chunk; FAISS shortlists can miss it.
+    Scan on-disk chunks when we need NAV but retrieval didn't surface a `nav:` line.
+    """
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _NAV_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _first_chunk_hit_with_expense_ratio(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    """
+    `historic_fund_expense[...]` appears in many schemes and can dominate retrieval.
+    When the user asks for expense ratio, prefer the canonical top-level `expense_ratio:` line.
+    """
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _EXPENSE_RATIO_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _first_chunk_hit_with_exit_load(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _EXIT_LOAD_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _first_chunk_hit_with_lock_in_years(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _LOCK_IN_YEARS_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _canonical_value_lines(text: str, intent: set[str], *, max_lines: int = 6) -> list[str]:
+    """
+    Pull verbatim `key: value` lines from structured chunk text for keys we inferred from the query.
+    Longer keys first so `benchmark_name` wins over `benchmark` when both appear on separate lines.
+    """
+    keys = _primary_intent_keys(intent)
+    if not keys:
+        return []
+    lines = [ln.strip() for ln in _LINE_SPLIT.split(text) if ln.strip()]
+    out: list[str] = []
+
+    # Special-case: NAV returns a single line including nav_date if available.
+    if keys and keys[0] == "nav":
+        nav_ln: str | None = None
+        nav_date_ln: str | None = None
+        for ln in lines:
+            ll = ln.lower()
+            if ll.startswith("nav:"):
+                nav_ln = ln
+            elif ll.startswith("nav_date:"):
+                nav_date_ln = ln
+            if nav_ln and ("nav_date" not in intent or nav_date_ln):
+                break
+        if nav_ln and nav_date_ln:
+            return [f"{nav_ln} ({nav_date_ln})"]
+        if nav_ln:
+            return [nav_ln]
+        return []
+
+    # Default: return the first exact `key:` line for the primary requested key.
+    primary = keys[0]
+    prefix = f"{primary.lower()}:"
+    for ln in lines:
+        if ln.lower().startswith(prefix):
+            out.append(ln)
+            break
+    return out[:max_lines]
 
 
 @dataclass(frozen=True)
@@ -27,6 +217,7 @@ class AnswerResult:
     citation_url: str  # empty when UNKNOWN
     last_updated_utc_date: str  # YYYY-MM-DD (UTC)
     hits: list[ChunkHit]
+    used_canonical_extraction: bool = False
 
 
 def _load_last_updated(registry_latest_path: Path, *, fallback: str = "1970-01-01") -> str:
@@ -104,6 +295,9 @@ def answer_query(
     except Exception:
         faiss_dir = None
 
+    nq = normalize_query(query)
+    intent_nav = infer_intent_fields(nq)
+
     hits = retrieve(
         chunks_root=chunks_root,
         query=query,
@@ -111,6 +305,38 @@ def answer_query(
         scheme_filter=scheme_filter,
         faiss_index_dir=faiss_dir,
     )
+    if "nav" in intent_nav and not _hits_include_nav_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_nav(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
+    if "expense_ratio" in intent_nav and not _hits_include_expense_ratio_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_expense_ratio(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
+    if "exit_load" in intent_nav and not _hits_include_exit_load_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_exit_load(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
+    if ("additional_details.lock_in_yrs" in intent_nav or "lock_in.years" in intent_nav) and not _hits_include_lock_in_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_lock_in_years(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
     if not hits:
         # No hit → still return a safe response without fabricating facts.
         last = _load_last_updated(registry_latest_path)
@@ -119,10 +345,28 @@ def answer_query(
             citation_url="",
             last_updated_utc_date=last,
             hits=[],
+            used_canonical_extraction=False,
         )
 
+    intent = intent_nav
+    extract_keys = _extraction_intent_keys(intent)
+
     top = hits[0]
-    lines = _extract_relevant_lines(top.text, query=query)
+    canonical: list[str] = []
+    if extract_keys:
+        for h in hits:
+            canonical = _canonical_value_lines(h.text, intent)
+            if canonical:
+                top = h
+                break
+
+    if canonical:
+        lines = canonical
+        used_canonical = True
+    else:
+        lines = _extract_relevant_lines(top.text, query=query)
+        used_canonical = False
+
     # If we can't extract anything meaningful, treat it as UNKNOWN.
     if not lines:
         last = _load_last_updated(registry_latest_path)
@@ -131,11 +375,18 @@ def answer_query(
             citation_url="",
             last_updated_utc_date=last,
             hits=hits,
+            used_canonical_extraction=False,
         )
     a = _compose_answer(lines)
 
     last = _load_last_updated(registry_latest_path)
     # enforce exactly one citation URL (top hit source_url)
     citation = top.source_url
-    return AnswerResult(answer_text=a, citation_url=citation, last_updated_utc_date=last, hits=hits)
+    return AnswerResult(
+        answer_text=a,
+        citation_url=citation,
+        last_updated_utc_date=last,
+        hits=hits,
+        used_canonical_extraction=used_canonical,
+    )
 
