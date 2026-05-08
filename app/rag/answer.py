@@ -23,6 +23,9 @@ _NAV_KEY_LINE = re.compile(r"(?m)^nav:\s*\S")
 _EXPENSE_RATIO_KEY_LINE = re.compile(r"(?m)^expense_ratio:\s*\S")
 _EXIT_LOAD_KEY_LINE = re.compile(r"(?m)^exit_load:\s*\S")
 _LOCK_IN_YEARS_KEY_LINE = re.compile(r"(?m)^(additional_details\.lock_in_yrs|lock_in\.years):\s*\S")
+_GROWW_RATING_KEY_LINE = re.compile(r"(?m)^groww_rating:\s*\S")
+_RISK_RATING_KEY_LINE = re.compile(r"(?m)^risk_rating:\s*\S")
+_NFO_RISK_KEY_LINE = re.compile(r"(?m)^nfo_risk:\s*\S")
 
 # Nested / noisy keys: use for retrieval boosts elsewhere, but not for verbatim answer lines
 # (e.g. fund_manager_details lists many person_name rows; top-level fund_manager is authoritative).
@@ -49,6 +52,12 @@ def _primary_intent_keys(intent: set[str]) -> list[str]:
         return ["benchmark_name"]
     if "benchmark" in intent:
         return ["benchmark"]
+    if "groww_rating" in intent:
+        return ["groww_rating"]
+    if "nfo_risk" in intent:
+        return ["nfo_risk"]
+    if "risk_rating" in intent:
+        return ["risk_rating"]
     # NAV: keep nav_date inline as supporting context (still one line output).
     if "nav" in intent:
         return ["nav", "nav_date"] if "nav_date" in intent else ["nav"]
@@ -82,6 +91,17 @@ def _hits_include_exit_load_line(hits: list[ChunkHit]) -> bool:
 
 def _hits_include_lock_in_line(hits: list[ChunkHit]) -> bool:
     return any(_LOCK_IN_YEARS_KEY_LINE.search(h.text) for h in hits)
+
+
+def _hits_include_groww_rating_line(hits: list[ChunkHit]) -> bool:
+    return any(_GROWW_RATING_KEY_LINE.search(h.text) for h in hits)
+
+
+def _hits_include_risk_rating_line(hits: list[ChunkHit]) -> bool:
+    return any(_RISK_RATING_KEY_LINE.search(h.text) for h in hits)
+
+def _hits_include_nfo_risk_line(hits: list[ChunkHit]) -> bool:
+    return any(_NFO_RISK_KEY_LINE.search(h.text) for h in hits)
 
 
 def _first_chunk_hit_with_nav(
@@ -159,6 +179,66 @@ def _first_chunk_hit_with_lock_in_years(
     for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
         text = str(row.get("text") or "")
         if not _LOCK_IN_YEARS_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _first_chunk_hit_with_groww_rating(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _GROWW_RATING_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _first_chunk_hit_with_risk_rating(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _RISK_RATING_KEY_LINE.search(text):
+            continue
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=text,
+        )
+    return None
+
+
+def _first_chunk_hit_with_nfo_risk(
+    chunks_root: Path,
+    scheme_filter: set[str] | None,
+) -> ChunkHit | None:
+    for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        text = str(row.get("text") or "")
+        if not _NFO_RISK_KEY_LINE.search(text):
             continue
         return ChunkHit(
             chunk_id=str(row["chunk_id"]),
@@ -333,6 +413,30 @@ def answer_query(
         scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
         if scan_schemes:
             fill = _first_chunk_hit_with_lock_in_years(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
+    if "groww_rating" in intent_nav and not _hits_include_groww_rating_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_groww_rating(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
+    if "risk_rating" in intent_nav and not _hits_include_risk_rating_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_risk_rating(chunks_root, scan_schemes)
+            if fill:
+                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
+                hits = [fill] + rest
+
+    if "nfo_risk" in intent_nav and not _hits_include_nfo_risk_line(hits):
+        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
+        if scan_schemes:
+            fill = _first_chunk_hit_with_nfo_risk(chunks_root, scan_schemes)
             if fill:
                 rest = [h for h in hits if h.chunk_id != fill.chunk_id]
                 hits = [fill] + rest

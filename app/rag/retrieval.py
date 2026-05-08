@@ -31,7 +31,8 @@ def _tokenize(q: str) -> list[str]:
 def normalize_query(q: str) -> str:
     ql = q.lower().strip()
     # small, explicit synonym map (rules only)
-    ql = ql.replace("ter", "expense ratio")
+    # Use word boundaries to avoid corrupting words like "riskometer".
+    ql = re.sub(r"\bter\b", "expense ratio", ql)
     ql = ql.replace("exitload", "exit load")
     # Align phrasing with corpus key `nav:` (often stored far from other scheme fields)
     ql = re.sub(r"\bnet\s+asset\s+value\b", "nav", ql)
@@ -39,6 +40,10 @@ def normalize_query(q: str) -> str:
     # Lock-in phrasing (ELSS)
     ql = re.sub(r"\block[-\s]?in\s+period\b", "lock_in", ql)
     ql = re.sub(r"\block[-\s]?in\b", "lock_in", ql)
+    # Ratings
+    ql = re.sub(r"\bgroww\s+rating\b", "groww_rating", ql)
+    ql = re.sub(r"\brisk[-\s]?reward\s+rating\b", "risk_rating", ql)
+    ql = re.sub(r"\briskometer\b", "nfo_risk", ql)
     # prefer underscore form to match flattened mfServerSideData keys
     ql = ql.replace("exit load", "exit_load")
     ql = ql.replace("expense ratio", "expense_ratio")
@@ -78,6 +83,18 @@ def infer_intent_fields(q: str) -> set[str]:
     if "lock_in" in ql or re.search(r"\block\s*in\b", ql):
         out.add("additional_details.lock_in_yrs")
         out.add("lock_in.years")
+    # Ratings: `groww_rating` is the scheme rating shown on Groww.
+    # Queries about risk rating / riskometer map to `nfo_risk` (riskometer label in the corpus).
+    risk_like = bool(
+        re.search(r"\brisk[-\s]?reward\b", ql)
+        or re.search(r"\brisk\s+rating\b", ql)
+        or "nfo_risk" in ql
+        or "risk_rating" in ql
+    )
+    if "groww_rating" in ql or (re.search(r"\brating\b", ql) and not risk_like):
+        out.add("groww_rating")
+    if risk_like:
+        out.add("nfo_risk")
     return out
 
 
