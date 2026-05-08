@@ -179,6 +179,7 @@ def run_phase3_structured(
     registry_latest_path: Path,
     scheme_filter: set[str] | None = None,
     use_groq: bool = False,
+    force_groq: bool = False,
     groq_model: str = "llama-3.1-8b-instant",
 ) -> GuardrailStructured:
     label = classify_query(query)
@@ -273,9 +274,12 @@ def run_phase3_structured(
             llm_error=None,
         )
 
-    if use_groq and not res.used_canonical_extraction:
-        # LLM paraphrasing can distort numbers/names; skip when we already have verbatim `key: value` lines.
-        snippet = "\n".join([h.text[:800] for h in res.hits[:2]])
+    if use_groq and (force_groq or not res.used_canonical_extraction):
+        # When force_groq is enabled, we still ground to the exact extracted lines.
+        if res.grounded_lines:
+            snippet = "\n".join(res.grounded_lines)
+        else:
+            snippet = "\n".join([h.text[:800] for h in res.hits[:2]])
         try:
             ans_text = _groq_generate_answer_text(
                 query=query,

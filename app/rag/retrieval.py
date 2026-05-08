@@ -55,6 +55,9 @@ def normalize_query(q: str) -> str:
 def infer_intent_fields(q: str) -> set[str]:
     ql = q.lower()
     out: set[str] = set()
+    # "Summarize / about / objective" should map to canonical scheme description.
+    if re.search(r"\b(summar(ize|y)|about|objective|what\s+does\s+this\s+fund\s+do)\b", ql):
+        out.add("description")
     if "exit_load" in ql or "exit load" in ql or "exitload" in ql:
         out.add("exit_load")
     if "expense_ratio" in ql or "expense" in ql or "ter" in ql:

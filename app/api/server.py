@@ -40,7 +40,25 @@ from app.guardrails.phase3 import QueryLabel, run_phase3_structured
 from app.corpus.manifest import allowlisted_schemes
 
 
-_SCHEME_TOKEN_STOP = frozenset({"hdfc", "fund", "direct", "growth", "plan", "of", "and", "the"})
+_SCHEME_TOKEN_STOP = frozenset(
+    {
+        "hdfc",
+        "fund",
+        "direct",
+        "growth",
+        "plan",
+        "of",
+        "and",
+        "the",
+        # common noise tokens across scheme names
+        "cap",
+        "index",
+        "etf",
+        "fof",
+        "tax",
+        "saver",
+    }
+)
 
 
 def _infer_scheme_filter_from_query(*, query: str, chunks_root: Path) -> set[str] | None:
@@ -49,6 +67,9 @@ def _infer_scheme_filter_from_query(*, query: str, chunks_root: Path) -> set[str
     This prevents cross-scheme leakage (wrong facts + wrong citation URL) for scheme-specific questions.
     """
     q = (query or "").lower()
+    # Normalize common spelling variants
+    q = q.replace("defense", "defence")
+    q = re.sub(r"\bmidcap\b", "mid cap", q)
     q_tokens = set(re.findall(r"[a-z0-9]+", q))
     if not q_tokens:
         return None
@@ -60,9 +81,35 @@ def _infer_scheme_filter_from_query(*, query: str, chunks_root: Path) -> set[str
     except Exception:
         return None
 
+    # Build token rarity over allowlisted schemes for "single distinctive token" matching.
+    scheme_rows = {s.get("scheme_id"): s for s in allowlisted_schemes() if s.get("scheme_id")}
+    token_to_schemes: dict[str, set[str]] = {}
+    scheme_tokens: dict[str, set[str]] = {}
+
+    def tokens_for_scheme(sid: str) -> set[str]:
+        row = scheme_rows.get(sid) or {}
+        blob = " ".join(
+            [
+                str(sid),
+                str(row.get("slug") or ""),
+                str(row.get("display_name") or ""),
+            ]
+        ).lower()
+        blob = blob.replace("defense", "defence")
+        # Include 3-letter tokens (e.g. "mid") so schemes like "mid cap" can be inferred.
+        toks = {t for t in re.findall(r"[a-z0-9]+", blob) if t and t not in _SCHEME_TOKEN_STOP and len(t) >= 3}
+        return toks
+
     for p in scheme_dirs:
         sid = p.name
-        parts = [t for t in re.findall(r"[a-z0-9]+", sid.lower()) if t and t not in _SCHEME_TOKEN_STOP]
+        toks = tokens_for_scheme(sid)
+        scheme_tokens[sid] = toks
+        for t in toks:
+            token_to_schemes.setdefault(t, set()).add(sid)
+
+    for p in scheme_dirs:
+        sid = p.name
+        parts = scheme_tokens.get(sid) or set()
         if not parts:
             continue
         score = sum(1 for t in parts if t in q_tokens)
@@ -72,9 +119,30 @@ def _infer_scheme_filter_from_query(*, query: str, chunks_root: Path) -> set[str
         elif score == best_score and score > 0:
             best.append(sid)
 
-    # Require at least 2 matching tokens to avoid accidental matches.
+    # If we have at least 2 matching tokens, it's reliable.
     if best_score >= 2 and best:
         return {best[0]}
+
+    # If we have exactly 1 matching token, accept it only if that token is unique to a single scheme.
+    if best_score == 1 and best:
+        # First, if any matched token is globally unique, accept immediately.
+        for sid in best:
+            matched = [t for t in (scheme_tokens.get(sid) or set()) if t in q_tokens]
+            for t in matched:
+                schemes = token_to_schemes.get(t) or set()
+                if len(schemes) == 1:
+                    return {sid}
+
+        # Otherwise, break ties by choosing the most specific scheme name:
+        # fewer remaining tokens implies a more specific match (e.g. "mid cap" vs "large and mid cap").
+        best_sorted = sorted(best, key=lambda s: (len(scheme_tokens.get(s) or set()), s))
+        if best_sorted:
+            # Only accept if the top choice is strictly more specific than the runner-up.
+            top = best_sorted[0]
+            top_len = len(scheme_tokens.get(top) or set())
+            runner_len = len(scheme_tokens.get(best_sorted[1]) or set()) if len(best_sorted) > 1 else None
+            if runner_len is None or top_len < runner_len:
+                return {top}
     return None
 
 
@@ -186,6 +254,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "llm_provider": "groq",
                     "groq_configured": _groq_api_configured(),
                     "groq_default_on": _default_use_groq(),
+                    "use_groq_default_env": os.getenv("USE_GROQ_DEFAULT"),
                     "groq_model_default": _default_groq_model(),
                 },
             )
@@ -320,6 +389,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             use_groq = bool(req.get("use_groq"))
         else:
             use_groq = _default_use_groq()
+        force_groq = bool(req.get("force_groq")) if "force_groq" in req else False
         groq_model = str(req.get("groq_model") or _default_groq_model())
 
         chunks_root = Path("data/chunks")
@@ -334,6 +404,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             registry_latest_path=latest_batch,
             scheme_filter=scheme_filter,
             use_groq=use_groq,
+            force_groq=force_groq,
             groq_model=groq_model,
         )
 

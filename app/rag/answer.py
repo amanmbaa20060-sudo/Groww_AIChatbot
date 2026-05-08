@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from app.rag.retrieval import ChunkHit, infer_intent_fields, iter_chunks, normalize_query, retrieve
+from app.corpus.manifest import allowlisted_schemes
 
 _LINE_SPLIT = re.compile(r"\r?\n")
 _NAV_KEY_LINE = re.compile(r"(?m)^nav:\s*\S")
@@ -30,6 +31,8 @@ _NFO_RISK_KEY_LINE = re.compile(r"(?m)^nfo_risk:\s*\S")
 # Nested / noisy keys: use for retrieval boosts elsewhere, but not for verbatim answer lines
 # (e.g. fund_manager_details lists many person_name rows; top-level fund_manager is authoritative).
 _EXTRACTION_SKIP_KEYS = frozenset({"fund_manager_details"})
+
+_RE_HTML_TAG = re.compile(r"<[^>]+>")
 
 
 def _extraction_intent_keys(intent: set[str]) -> set[str]:
@@ -74,6 +77,8 @@ def _primary_intent_keys(intent: set[str]) -> list[str]:
     # AUM
     if "aum" in intent:
         return ["aum"]
+    if "description" in intent:
+        return ["description"]
     return sorted(_extraction_intent_keys(intent), key=len, reverse=True)
 
 
@@ -298,6 +303,7 @@ class AnswerResult:
     last_updated_utc_date: str  # YYYY-MM-DD (UTC)
     hits: list[ChunkHit]
     used_canonical_extraction: bool = False
+    grounded_lines: list[str] | None = None
 
 
 def _load_last_updated(registry_latest_path: Path, *, fallback: str = "1970-01-01") -> str:
@@ -349,10 +355,70 @@ def _compose_answer(lines: list[str], *, max_sentences: int = 3) -> str:
     if not lines:
         return "I couldn’t find a matching factual snippet in the indexed corpus."
     # simple sentence cap: join lines and then split on period-like punctuation
-    text = " ".join(lines)
+    text = _RE_HTML_TAG.sub("", " ".join(lines)).strip()
     parts = re.split(r"(?<=[.?!])\s+", text)
     trimmed = " ".join(parts[:max_sentences]).strip()
     return trimmed if trimmed else text.strip()
+
+
+def _scheme_display_name(scheme_id: str) -> str:
+    for s in allowlisted_schemes():
+        if s.get("scheme_id") == scheme_id and s.get("display_name"):
+            return str(s["display_name"])
+    # fallback: prettify scheme_id
+    return scheme_id.replace("_", " ").strip()
+
+
+def _friendly_one_liner(*, scheme_name: str, key: str, value: str, extra: str | None = None) -> str:
+    k = key.lower().strip()
+    v = value.strip()
+    # Clean common punctuation/duplication from values (keeps facts unchanged).
+    v = re.sub(r"\s+", " ", v).strip()
+    v = re.sub(r"[.]+\s*$", "", v).strip()
+    if extra:
+        extra = extra.strip()
+    if k == "nav":
+        # include nav_date as "as of" when present
+        if extra:
+            return f'The NAV for {scheme_name} is {v} (as of {extra}).'
+        return f"The NAV for {scheme_name} is {v}."
+    if k == "expense_ratio":
+        return f"The expense ratio for {scheme_name} is {v}."
+    if k == "exit_load":
+        # Values sometimes already start with "Exit load ..."; avoid "exit load ... is Exit load ...".
+        v2 = re.sub(r"^\s*exit\s*load\s*(of|:)?\s*", "", v, flags=re.IGNORECASE).strip()
+        v2 = v2 if v2 else v
+        return f"The exit load for {scheme_name} is {v2}."
+    if k in {"lock_in.years", "additional_details.lock_in_yrs"}:
+        return f"The lock-in period for {scheme_name} is {v}."
+    if k == "groww_rating":
+        return f"The Groww rating for {scheme_name} is {v}."
+    if k == "risk_rating":
+        return f"The risk rating for {scheme_name} is {v}."
+    if k == "nfo_risk":
+        return f"The riskometer for {scheme_name} is {v}."
+    if k == "fund_manager":
+        return f"The fund manager for {scheme_name} is {v}."
+    if k in {"benchmark", "benchmark_name"}:
+        return f"The benchmark for {scheme_name} is {v}."
+    if k in {"aum"}:
+        return f"The AUM for {scheme_name} is {v}."
+    if k in {"tax_impact", "category_info.tax_impact"}:
+        return f"The tax impact for {scheme_name} is {v}."
+    if k == "description":
+        return f"About {scheme_name}: {v}."
+    return f"The {k.replace('_', ' ')} for {scheme_name} is {v}."
+
+
+def _parse_key_value(line: str) -> tuple[str, str] | None:
+    if ":" not in line:
+        return None
+    k, v = line.split(":", 1)
+    k = k.strip()
+    v = _RE_HTML_TAG.sub("", v).strip()
+    if not k or not v:
+        return None
+    return k, v
 
 
 def answer_query(
@@ -450,6 +516,7 @@ def answer_query(
             last_updated_utc_date=last,
             hits=[],
             used_canonical_extraction=False,
+            grounded_lines=None,
         )
 
     intent = intent_nav
@@ -463,6 +530,19 @@ def answer_query(
             if canonical:
                 top = h
                 break
+
+        # If the user asked for a specific factual key and we couldn't find the exact `key: value`
+        # line anywhere in the retrieved hits, treat as UNKNOWN (avoid answering with an unrelated fact).
+        if not canonical:
+            last = _load_last_updated(registry_latest_path)
+            return AnswerResult(
+                answer_text="I couldn’t find that information in the indexed corpus.",
+                citation_url="",
+                last_updated_utc_date=last,
+                hits=hits,
+                used_canonical_extraction=False,
+                grounded_lines=None,
+            )
 
     if canonical:
         lines = canonical
@@ -480,8 +560,24 @@ def answer_query(
             last_updated_utc_date=last,
             hits=hits,
             used_canonical_extraction=False,
+            grounded_lines=None,
         )
-    a = _compose_answer(lines)
+    # Factual output should be one friendly line when we have a canonical key/value.
+    if used_canonical and lines:
+        scheme_name = _scheme_display_name(top.scheme_id)
+        # special case: "nav: ... (nav_date: ...)" from canonical extraction
+        ln = lines[0]
+        m = re.match(r"^\s*nav:\s*(.+?)\s*\(\s*nav_date:\s*(.+?)\s*\)\s*$", ln, flags=re.IGNORECASE)
+        if m:
+            a = _friendly_one_liner(scheme_name=scheme_name, key="nav", value=m.group(1), extra=m.group(2))
+        else:
+            kv = _parse_key_value(ln)
+            if kv:
+                a = _friendly_one_liner(scheme_name=scheme_name, key=kv[0], value=kv[1])
+            else:
+                a = _compose_answer(lines, max_sentences=1)
+    else:
+        a = _compose_answer(lines, max_sentences=1)
 
     last = _load_last_updated(registry_latest_path)
     # enforce exactly one citation URL (top hit source_url)
@@ -492,5 +588,6 @@ def answer_query(
         last_updated_utc_date=last,
         hits=hits,
         used_canonical_extraction=used_canonical,
+        grounded_lines=lines,
     )
 
