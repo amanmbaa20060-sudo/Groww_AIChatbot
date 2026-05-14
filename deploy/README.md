@@ -32,3 +32,31 @@ This project’s indexed artifacts (`data/chunks/`, `data/registry/`, etc.) are 
 For production, you must either:
 - Build and persist these artifacts on the server, or
 - Store and load them from a separate artifact store.
+
+## Deploy frontend on Streamlit Cloud
+
+The Streamlit UI lives at `streamlit_app.py` and talks to the Render backend over HTTP (no FAISS/embeddings on Streamlit).
+
+### Steps
+
+1. Push this repo to GitHub.
+2. Go to [share.streamlit.io](https://share.streamlit.io) → **Create app** → pick your repo.
+3. Set **Main file path** to `streamlit_app.py`.
+4. Under **Advanced settings**, set **Python dependencies file** to `requirements-streamlit.txt`.
+5. In **Secrets**, add your backend URL (replace with your Render service URL):
+
+```toml
+RAG_BACKEND_URL = "https://groww-rag-backend.onrender.com"
+```
+
+6. Deploy. The app calls `POST /query` and `GET /schemes` on that host.
+
+### Local Streamlit dev
+
+```powershell
+pip install -r requirements-streamlit.txt
+$env:RAG_BACKEND_URL = "http://localhost:8787"
+streamlit run streamlit_app.py
+```
+
+Run the Python API separately (`python -m app.api.server`).
