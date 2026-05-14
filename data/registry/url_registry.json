@@ -1,195 +1,195 @@
 {
   "phase": "1.6",
-  "generated_at_utc": "2026-05-14T10:13:55Z",
+  "generated_at_utc": "2026-05-14T10:17:29Z",
   "schemes": [
     {
       "scheme_id": "hdfc_mid_cap_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-mid-cap-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:41Z",
+      "last_fetch_utc": "2026-05-14T10:17:20Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "6c69d70b5dca6ef61bbe568c53e5dd85a5881e9f365345707f88869c009b7d94",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_mid_cap_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_mid_cap_direct_growth\\headers.json"
+      "content_sha256": "cae917cc0853f9b43bb158fc1ac361229b58356c7f7762a32b990d342262fb4a",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_mid_cap_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_mid_cap_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_silver_etf_fof_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-silver-etf-fof-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:42Z",
+      "last_fetch_utc": "2026-05-14T10:17:20Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "7a0ebb36fac9f6a16c57f308de450687fea2fea7c9a7d47d092643a2a99be1a9",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_silver_etf_fof_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_silver_etf_fof_direct_growth\\headers.json"
+      "content_sha256": "c572aa49c1218383de0e1e00c34814369342b023c49b684fe764bcb8e270f3d7",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_silver_etf_fof_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_silver_etf_fof_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_equity_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-equity-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:42Z",
+      "last_fetch_utc": "2026-05-14T10:17:20Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "64cba249644e4ade3ddb84ba7e25404354c4aa907f6df4b704b40493cfa4ae7f",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_equity_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_equity_direct_growth\\headers.json"
+      "content_sha256": "7bda334363c7e31e3bfdd2c04f97be46050306a07bd77d39705cf6819e0324fe",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_equity_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_equity_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_small_cap_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-small-cap-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:43Z",
+      "last_fetch_utc": "2026-05-14T10:17:21Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "6d10202f69006cb2d962607fc302aca86f251e369caf081c439b2e59ce7645e1",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_small_cap_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_small_cap_direct_growth\\headers.json"
+      "content_sha256": "b372a95cdef6005c27d3eb246078796b8a229b38454c7ee7126ec169b0f89226",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_small_cap_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_small_cap_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_nifty_50_index_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-nifty-50-index-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:44Z",
+      "last_fetch_utc": "2026-05-14T10:17:21Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "377f3ad488110413f3f83a29048b644d0c595d846ec739103be8a9546b7a9a8e",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_nifty_50_index_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_nifty_50_index_direct_growth\\headers.json"
+      "content_sha256": "63a6ceb5fb5eb397cc5db80ad80286a8d26efad04754a919fd0a44de1f931a90",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_nifty_50_index_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_nifty_50_index_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_gold_etf_fof_direct_plan_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-gold-etf-fund-of-fund-direct-plan-growth",
-      "last_fetch_utc": "2026-05-14T10:13:44Z",
+      "last_fetch_utc": "2026-05-14T10:17:22Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "4e9bfd07f15cef89079ebfbfa0d00058fd5d253bc94e6de275e5702e718ab4c1",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_gold_etf_fof_direct_plan_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_gold_etf_fof_direct_plan_growth\\headers.json"
+      "content_sha256": "d032f51659a0e699fe78e3150d7863f9b9dad40382b3983d5fec83ce3a0720bb",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_gold_etf_fof_direct_plan_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_gold_etf_fof_direct_plan_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_defence_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-defence-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:45Z",
+      "last_fetch_utc": "2026-05-14T10:17:22Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "b45eb5a77c143b63e37f750932458e504f9b026ecf5b423151d9e1152d9767c8",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_defence_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_defence_direct_growth\\headers.json"
+      "content_sha256": "38c384449bdc2c8680c368c7b19d8143d21f6e95300d941d81ef5e366dde3122",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_defence_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_defence_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_balanced_advantage_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-balanced-advantage-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:46Z",
+      "last_fetch_utc": "2026-05-14T10:17:23Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "aa906e497534f5be328bebfde065eb1f4049a630f5628d08450fd449b23598d2",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_balanced_advantage_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_balanced_advantage_direct_growth\\headers.json"
+      "content_sha256": "b365f7f9ba0bb801a2e49a4de0eb75c9dc1016a4486484f4126a25b2ca8b167d",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_balanced_advantage_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_balanced_advantage_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_multi_cap_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-multi-cap-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:47Z",
+      "last_fetch_utc": "2026-05-14T10:17:23Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "2823511decf5af487561130ea5512d199877d63cf9335564a35793f07f3a41b2",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_multi_cap_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_multi_cap_direct_growth\\headers.json"
+      "content_sha256": "64ab78ab1da768e860f815318ca09a255d350621305d8f7d63232158233b2cc2",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_multi_cap_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_multi_cap_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_short_term_opportunities_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-short-term-opportunities-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:47Z",
+      "last_fetch_utc": "2026-05-14T10:17:24Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "ba8d711218d65513cdc61de49e9296bc3de1474d2b6914f241495031141752b7",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_short_term_opportunities_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_short_term_opportunities_direct_growth\\headers.json"
+      "content_sha256": "bdf49a0051a316342cdb0a8ec0d04c8d8fbfcaa087a8391c9b5b003abf8bfaa4",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_short_term_opportunities_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_short_term_opportunities_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_focused_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-focused-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:48Z",
+      "last_fetch_utc": "2026-05-14T10:17:24Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "0fa7eb2d19425a6ab0fdfcbc600f9129fbcbf6dc024889d6504a0962a90ed1cc",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_focused_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_focused_direct_growth\\headers.json"
+      "content_sha256": "a4017ee62029b280dad2a6bc309fb294cd916114b8601c1c7b05de6ec8d72d16",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_focused_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_focused_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_pharma_healthcare_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-pharma-and-healthcare-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:49Z",
+      "last_fetch_utc": "2026-05-14T10:17:24Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "39074c96c38133d9f8a0077fe38162c44547df2d71385f906519f2209e924f09",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_pharma_healthcare_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_pharma_healthcare_direct_growth\\headers.json"
+      "content_sha256": "af38350146f6e8378a88a635e6ce66836488abc083611e7e0ccaaaa9866bfb2c",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_pharma_healthcare_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_pharma_healthcare_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_bse_sensex_index_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-bse-sensex-index-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:50Z",
+      "last_fetch_utc": "2026-05-14T10:17:25Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "5ddbba343a22e3309e06abe715a9adefe16f13d42c321b9305767420759239e8",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_bse_sensex_index_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_bse_sensex_index_direct_growth\\headers.json"
+      "content_sha256": "a5bc9d83af6bbaa3e704f4a69c6ba55ed267c316638dc5c67534997d66f0c976",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_bse_sensex_index_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_bse_sensex_index_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_large_cap_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-large-cap-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:50Z",
+      "last_fetch_utc": "2026-05-14T10:17:25Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "0d45fb68486cf736773a57e69f04fe193d18c8e08489e2efecbfecd1420fd802",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_large_cap_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_large_cap_direct_growth\\headers.json"
+      "content_sha256": "4e037e651cf5486c7e8842c0886ef35b998746f95d5865f9844da47b4da79601",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_large_cap_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_large_cap_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_large_and_mid_cap_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-large-and-mid-cap-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:51Z",
+      "last_fetch_utc": "2026-05-14T10:17:26Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "2648dcd8c1ac78e7501f61874e08386f0a42cf78e294ac69d156447bc5cd79be",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_large_and_mid_cap_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_large_and_mid_cap_direct_growth\\headers.json"
+      "content_sha256": "e7008196d079f241f8f542bc2c68b3fb20dfdb0468cf51d9b777fe84ee168b94",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_large_and_mid_cap_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_large_and_mid_cap_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_liquid_direct_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-liquid-fund-direct-growth",
-      "last_fetch_utc": "2026-05-14T10:13:52Z",
+      "last_fetch_utc": "2026-05-14T10:17:26Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "3235b035264abc9fbc1040dc22b8fffd0b2a8b6090f2b9189b2a168f863b5edd",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_liquid_direct_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_liquid_direct_growth\\headers.json"
+      "content_sha256": "4c988b48c39b987b247753242e8cbb7045475856197e96955433549317246720",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_liquid_direct_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_liquid_direct_growth/headers.json"
     },
     {
       "scheme_id": "hdfc_elss_tax_saver_direct_plan_growth",
       "source_url": "https://groww.in/mutual-funds/hdfc-elss-tax-saver-fund-direct-plan-growth",
-      "last_fetch_utc": "2026-05-14T10:13:52Z",
+      "last_fetch_utc": "2026-05-14T10:17:27Z",
       "http_status": 200,
       "etag": null,
       "last_modified": null,
-      "content_sha256": "033c4fdd73a1522e7a3ccc3ce84e6d86126c06c6c152223ab91aaa13018d6e42",
-      "raw_body_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_elss_tax_saver_direct_plan_growth\\body.html",
-      "raw_headers_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\raw\\hdfc_elss_tax_saver_direct_plan_growth\\headers.json"
+      "content_sha256": "15a97fe8801515e8e1cd6d0b33166ee75f5936db6c9477479ba51444c1ed8af4",
+      "raw_body_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_elss_tax_saver_direct_plan_growth/body.html",
+      "raw_headers_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/raw/hdfc_elss_tax_saver_direct_plan_growth/headers.json"
     }
   ],
   "ingestion_batch_date_utc": "2026-05-14",
-  "ingestion_batch_id": "batch_2026-05-14_1778753620"
+  "ingestion_batch_id": "batch_2026-05-14_1778753839"
 }
