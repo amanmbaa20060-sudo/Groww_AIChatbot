@@ -15,7 +15,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
+_DEFAULT_GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+def _groq_chat_url() -> str:
+    return (os.getenv("LLM_BASE_URL") or _DEFAULT_GROQ_URL).strip()
 
 
 class GroqError(RuntimeError):
@@ -48,12 +52,13 @@ def groq_chat_completion(
     }
     body = json.dumps(payload).encode("utf-8")
     req = Request(
-        GROQ_CHAT_COMPLETIONS_URL,
+        _groq_chat_url(),
         method="POST",
         data=body,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "User-Agent": "GrowwRAGChatbot/1.0",
         },
     )
     try:

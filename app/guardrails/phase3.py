@@ -68,14 +68,15 @@ def _groq_generate_answer_text(*, query: str, grounded_snippet: str, model: str)
     """
     sys_msg = (
         "You are a facts-only mutual fund FAQ assistant. "
-        "You must answer ONLY using the provided snippet. "
-        "Max 3 sentences. Do NOT provide investment advice. "
-        "Do NOT include any URLs in the answer text."
+        "Answer ONLY using the provided snippet. "
+        "Return exactly ONE friendly sentence. "
+        "Preserve numbers, dates, and fund names exactly as in the snippet. "
+        "Do NOT provide investment advice. Do NOT include URLs."
     )
     user_msg = (
         f"Question: {query}\n\n"
         f"Snippet (ground truth):\n{grounded_snippet}\n\n"
-        "Return the direct factual answer."
+        "Write one sentence that answers the question."
     )
     r = groq_chat_completion(
         model=model,

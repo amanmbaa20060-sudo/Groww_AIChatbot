@@ -169,13 +169,21 @@ def _groq_api_configured() -> bool:
     return bool(os.getenv("GROQ_API_KEY", "").strip())
 
 
+def _env_flag(name: str) -> bool:
+    v = (os.getenv(name) or "").strip().lower()
+    return v in {"1", "true", "yes", "on"}
+
+
 def _default_use_groq() -> bool:
-    # Factual answers use verbatim corpus lines by default; Groq can rephrase and introduce errors.
     # Opt in per request with `"use_groq": true` or set USE_GROQ_DEFAULT=1 in the environment.
-    v = (os.getenv("USE_GROQ_DEFAULT") or "").strip().lower()
-    if v in {"1", "true", "yes", "on"}:
+    if _env_flag("USE_GROQ_DEFAULT"):
         return _groq_api_configured()
     return False
+
+
+def _default_force_groq() -> bool:
+    # When Groq is default-on, also use it for canonical key:value facts unless overridden.
+    return _default_use_groq() and _env_flag("USE_GROQ_DEFAULT")
 
 
 def _default_groq_model() -> str:
@@ -389,7 +397,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             use_groq = bool(req.get("use_groq"))
         else:
             use_groq = _default_use_groq()
-        force_groq = bool(req.get("force_groq")) if "force_groq" in req else False
+        if "force_groq" in req:
+            force_groq = bool(req.get("force_groq"))
+        else:
+            force_groq = _default_force_groq()
         groq_model = str(req.get("groq_model") or _default_groq_model())
 
         chunks_root = Path("data/chunks")
