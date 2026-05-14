@@ -3,8 +3,8 @@ name: Corpus refresh (scheduler)
 
 on:
   schedule:
-    # Weekly: Monday 02:00 UTC
-    - cron: "0 2 * * 1"
+    # Daily 10:00 IST (04:30 UTC)
+    - cron: "30 4 * * *"
   workflow_dispatch:
 
 permissions:
