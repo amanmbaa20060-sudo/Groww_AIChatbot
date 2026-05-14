@@ -86,17 +86,18 @@ def infer_intent_fields(q: str) -> set[str]:
     if "lock_in" in ql or re.search(r"\block\s*in\b", ql):
         out.add("additional_details.lock_in_yrs")
         out.add("lock_in.years")
-    # Ratings: `groww_rating` is the scheme rating shown on Groww.
-    # Queries about risk rating / riskometer map to `nfo_risk` (riskometer label in the corpus).
-    risk_like = bool(
+    # Ratings: Groww star rating vs numeric risk-reward vs SEBI riskometer label.
+    riskometer_like = bool(re.search(r"\briskometer\b", ql) or "nfo_risk" in ql)
+    risk_score_like = bool(
         re.search(r"\brisk[-\s]?reward\b", ql)
         or re.search(r"\brisk\s+rating\b", ql)
-        or "nfo_risk" in ql
         or "risk_rating" in ql
     )
-    if "groww_rating" in ql or (re.search(r"\brating\b", ql) and not risk_like):
+    if "groww_rating" in ql or (re.search(r"\brating\b", ql) and not risk_score_like and not riskometer_like):
         out.add("groww_rating")
-    if risk_like:
+    if risk_score_like:
+        out.add("risk_rating")
+    if riskometer_like:
         out.add("nfo_risk")
     return out
 
@@ -317,6 +318,12 @@ def retrieve(
             boost += 20.0
         if "nav" in intent and re.search(r"(?m)^nav:\s*\S", text):
             boost += 25.0
+        if "groww_rating" in intent and re.search(r"groww_rating:\s*\S|risk-reward rating of \d", text, re.I):
+            boost += 22.0
+        if "risk_rating" in intent and re.search(
+            r"(?m)(?:return_stats\[0\]\.)?risk_rating:\s*\S|risk-reward rating of \d", text, re.I
+        ):
+            boost += 22.0
         for k in intent:
             if re.search(rf"(?m)^{re.escape(k)}:", text):
                 boost += 30.0

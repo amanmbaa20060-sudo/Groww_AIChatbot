@@ -41,6 +41,12 @@ _RE_ADVICE = re.compile(r"\b(should i|recommend|suggest|good investment|buy|sell
 _RE_COMPARE = re.compile(r"\b(vs\.?|versus|better than|compare|which is better)\b", re.IGNORECASE)
 _RE_PERF = re.compile(r"\b(returns?|cagr|performance|rank|best performer|past performance)\b", re.IGNORECASE)
 
+_NON_FACTUAL_REFUSAL = (
+    "Hey, I can't provide investment advice or comparisons. "
+    "If you ask for a specific factual question (expense ratio, exit load, benchmark, etc.), "
+    "I can help you with the answer."
+)
+
 
 @dataclass(frozen=True)
 class GuardrailResult:
@@ -229,7 +235,7 @@ def run_phase3_structured(
         # For advisory/comparison, we still refuse; keep response URL-free by default.
         return GuardrailStructured(
             label=label,
-            answer_text="I can’t provide investment advice or comparisons. If you ask for a specific factual field (expense ratio, exit load, benchmark, etc.), I can answer from the indexed corpus.",
+            answer_text=_NON_FACTUAL_REFUSAL,
             citation_url=None,
             last_updated_utc_date=None,
             llm_used=False,

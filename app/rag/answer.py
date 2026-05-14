@@ -24,9 +24,8 @@ _NAV_KEY_LINE = re.compile(r"(?m)^nav:\s*\S")
 _EXPENSE_RATIO_KEY_LINE = re.compile(r"(?m)^expense_ratio:\s*\S")
 _EXIT_LOAD_KEY_LINE = re.compile(r"(?m)^exit_load:\s*\S")
 _LOCK_IN_YEARS_KEY_LINE = re.compile(r"(?m)^(additional_details\.lock_in_yrs|lock_in\.years):\s*\S")
-_GROWW_RATING_KEY_LINE = re.compile(r"(?m)^groww_rating:\s*\S")
-_RISK_RATING_KEY_LINE = re.compile(r"(?m)^risk_rating:\s*\S")
-_NFO_RISK_KEY_LINE = re.compile(r"(?m)^nfo_risk:\s*\S")
+_META_RR_RATING = re.compile(r"risk-reward rating of ([^\s/]+)/10", re.IGNORECASE)
+_RETURN_STATS_RISK_RATING = re.compile(r"(?m)^return_stats\[0\]\.risk_rating:\s*(\S+)")
 
 # Nested / noisy keys: use for retrieval boosts elsewhere, but not for verbatim answer lines
 # (e.g. fund_manager_details lists many person_name rows; top-level fund_manager is authoritative).
@@ -98,15 +97,105 @@ def _hits_include_lock_in_line(hits: list[ChunkHit]) -> bool:
     return any(_LOCK_IN_YEARS_KEY_LINE.search(h.text) for h in hits)
 
 
+def _scheme_slug(scheme_id: str) -> str:
+    for s in allowlisted_schemes():
+        if s.get("scheme_id") == scheme_id and s.get("slug"):
+            return str(s["slug"])
+    return ""
+
+
+def _is_valid_rating_value(value: str) -> bool:
+    v = (value or "").strip().lower()
+    return bool(v) and v not in {"null", "none", "n/a", "na"}
+
+
+def _peer_comparison_field(text: str, *, scheme_slug: str, field: str) -> str | None:
+    if not scheme_slug:
+        return None
+    for m in re.finditer(
+        rf"(?m)^peerComparison\[(\d+)\]\.search_id:\s*{re.escape(scheme_slug)}\s*$",
+        text,
+    ):
+        idx = m.group(1)
+        fm = re.search(rf"(?m)^peerComparison\[{idx}\]\.{re.escape(field)}:\s*(\S+)\s*$", text)
+        if fm and _is_valid_rating_value(fm.group(1)):
+            return fm.group(1).strip()
+    return None
+
+
+def _meta_risk_reward_rating(text: str) -> str | None:
+    m = _META_RR_RATING.search(text)
+    if not m:
+        return None
+    v = m.group(1).strip()
+    return v if _is_valid_rating_value(v) else None
+
+
+def _extract_groww_rating_line(text: str, *, scheme_slug: str) -> str | None:
+    for ln in _LINE_SPLIT.split(text):
+        ln = ln.strip()
+        m = re.match(r"^groww_rating:\s*(\S+)\s*$", ln, flags=re.IGNORECASE)
+        if m and _is_valid_rating_value(m.group(1)):
+            return f"groww_rating: {m.group(1).strip()}"
+    peer = _peer_comparison_field(text, scheme_slug=scheme_slug, field="groww_rating")
+    if peer:
+        return f"groww_rating: {peer}"
+    meta = _meta_risk_reward_rating(text)
+    if meta:
+        return f"groww_rating: {meta}"
+    return None
+
+
+def _extract_risk_rating_line(text: str, *, scheme_slug: str) -> str | None:
+    meta = _meta_risk_reward_rating(text)
+    if meta:
+        return f"risk_rating: {meta}"
+    peer = _peer_comparison_field(text, scheme_slug=scheme_slug, field="risk_rating")
+    if peer:
+        return f"risk_rating: {peer}"
+    m = _RETURN_STATS_RISK_RATING.search(text)
+    if m and _is_valid_rating_value(m.group(1)):
+        return f"risk_rating: {m.group(1).strip()}"
+    for ln in _LINE_SPLIT.split(text):
+        ln = ln.strip()
+        m2 = re.match(r"^risk_rating:\s*(\S+)\s*$", ln, flags=re.IGNORECASE)
+        if m2 and _is_valid_rating_value(m2.group(1)):
+            return f"risk_rating: {m2.group(1).strip()}"
+    return None
+
+
+def _extract_nfo_risk_line(text: str) -> str | None:
+    for ln in _LINE_SPLIT.split(text):
+        ln = ln.strip()
+        if ln.lower().startswith("nfo_risk:"):
+            v = ln.split(":", 1)[1].strip()
+            if v:
+                return ln
+    return None
+
+
+def _chunk_has_groww_rating(text: str, *, scheme_slug: str) -> bool:
+    return _extract_groww_rating_line(text, scheme_slug=scheme_slug) is not None
+
+
+def _chunk_has_risk_rating(text: str, *, scheme_slug: str) -> bool:
+    return _extract_risk_rating_line(text, scheme_slug=scheme_slug) is not None
+
+
+def _chunk_has_nfo_risk(text: str) -> bool:
+    return _extract_nfo_risk_line(text) is not None
+
+
 def _hits_include_groww_rating_line(hits: list[ChunkHit]) -> bool:
-    return any(_GROWW_RATING_KEY_LINE.search(h.text) for h in hits)
+    return any(_chunk_has_groww_rating(h.text, scheme_slug=_scheme_slug(h.scheme_id)) for h in hits)
 
 
 def _hits_include_risk_rating_line(hits: list[ChunkHit]) -> bool:
-    return any(_RISK_RATING_KEY_LINE.search(h.text) for h in hits)
+    return any(_chunk_has_risk_rating(h.text, scheme_slug=_scheme_slug(h.scheme_id)) for h in hits)
+
 
 def _hits_include_nfo_risk_line(hits: list[ChunkHit]) -> bool:
-    return any(_NFO_RISK_KEY_LINE.search(h.text) for h in hits)
+    return any(_chunk_has_nfo_risk(h.text) for h in hits)
 
 
 def _first_chunk_hit_with_nav(
@@ -197,17 +286,74 @@ def _first_chunk_hit_with_lock_in_years(
     return None
 
 
+def _resolve_scheme_rating(
+    chunks_root: Path,
+    scheme_id: str,
+    intent: set[str],
+) -> tuple[ChunkHit | None, list[str]]:
+    """
+    Scan all chunks for a scheme and pick the best rating line.
+    Meta `risk-reward rating of X/10` wins over peer/return_stats fields.
+    """
+    slug = _scheme_slug(scheme_id)
+    meta_line: str | None = None
+    meta_hit: ChunkHit | None = None
+    primary_line: str | None = None
+    primary_hit: ChunkHit | None = None
+
+    def _as_hit(row: dict[str, Any]) -> ChunkHit:
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=str(row.get("text") or ""),
+        )
+
+    for row in iter_chunks(chunks_root, scheme_ids={scheme_id}):
+        text = str(row.get("text") or "")
+        if not text:
+            continue
+        hit = _as_hit(row)
+        if "groww_rating" in intent:
+            ln = _extract_groww_rating_line(text, scheme_slug=slug)
+        elif "risk_rating" in intent:
+            ln = _extract_risk_rating_line(text, scheme_slug=slug)
+        elif "nfo_risk" in intent:
+            ln = _extract_nfo_risk_line(text)
+        else:
+            ln = None
+        if not ln:
+            continue
+        if _meta_risk_reward_rating(text) and ("groww_rating" in intent or "risk_rating" in intent):
+            key = "groww_rating" if "groww_rating" in intent else "risk_rating"
+            meta_line = f"{key}: {_meta_risk_reward_rating(text)}"
+            meta_hit = hit
+        if primary_line is None:
+            primary_line = ln
+            primary_hit = hit
+
+    if meta_line and meta_hit:
+        return meta_hit, [meta_line]
+    if primary_line and primary_hit:
+        return primary_hit, [primary_line]
+    return None, []
+
+
 def _first_chunk_hit_with_groww_rating(
     chunks_root: Path,
     scheme_filter: set[str] | None,
 ) -> ChunkHit | None:
     for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        scheme_id = str(row["scheme_id"])
         text = str(row.get("text") or "")
-        if not _GROWW_RATING_KEY_LINE.search(text):
+        if not _chunk_has_groww_rating(text, scheme_slug=_scheme_slug(scheme_id)):
             continue
         return ChunkHit(
             chunk_id=str(row["chunk_id"]),
-            scheme_id=str(row["scheme_id"]),
+            scheme_id=scheme_id,
             source_url=str(row["source_url"]),
             doc_type=str(row.get("doc_type") or ""),
             section_path=str(row.get("section_path") or ""),
@@ -222,12 +368,13 @@ def _first_chunk_hit_with_risk_rating(
     scheme_filter: set[str] | None,
 ) -> ChunkHit | None:
     for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
+        scheme_id = str(row["scheme_id"])
         text = str(row.get("text") or "")
-        if not _RISK_RATING_KEY_LINE.search(text):
+        if not _chunk_has_risk_rating(text, scheme_slug=_scheme_slug(scheme_id)):
             continue
         return ChunkHit(
             chunk_id=str(row["chunk_id"]),
-            scheme_id=str(row["scheme_id"]),
+            scheme_id=scheme_id,
             source_url=str(row["source_url"]),
             doc_type=str(row.get("doc_type") or ""),
             section_path=str(row.get("section_path") or ""),
@@ -243,7 +390,7 @@ def _first_chunk_hit_with_nfo_risk(
 ) -> ChunkHit | None:
     for row in iter_chunks(chunks_root, scheme_ids=scheme_filter):
         text = str(row.get("text") or "")
-        if not _NFO_RISK_KEY_LINE.search(text):
+        if not _chunk_has_nfo_risk(text):
             continue
         return ChunkHit(
             chunk_id=str(row["chunk_id"]),
@@ -257,7 +404,7 @@ def _first_chunk_hit_with_nfo_risk(
     return None
 
 
-def _canonical_value_lines(text: str, intent: set[str], *, max_lines: int = 6) -> list[str]:
+def _canonical_value_lines(text: str, intent: set[str], *, scheme_id: str = "", max_lines: int = 6) -> list[str]:
     """
     Pull verbatim `key: value` lines from structured chunk text for keys we inferred from the query.
     Longer keys first so `benchmark_name` wins over `benchmark` when both appear on separate lines.
@@ -288,6 +435,15 @@ def _canonical_value_lines(text: str, intent: set[str], *, max_lines: int = 6) -
 
     # Default: return the first exact `key:` line for the primary requested key.
     primary = keys[0]
+    if primary == "groww_rating":
+        ln = _extract_groww_rating_line(text, scheme_slug=_scheme_slug(scheme_id))
+        return [ln] if ln else []
+    if primary == "risk_rating":
+        ln = _extract_risk_rating_line(text, scheme_slug=_scheme_slug(scheme_id))
+        return [ln] if ln else []
+    if primary == "nfo_risk":
+        ln = _extract_nfo_risk_line(text)
+        return [ln] if ln else []
     prefix = f"{primary.lower()}:"
     for ln in lines:
         if ln.lower().startswith(prefix):
@@ -394,7 +550,7 @@ def _friendly_one_liner(*, scheme_name: str, key: str, value: str, extra: str | 
     if k == "groww_rating":
         return f"The Groww rating for {scheme_name} is {v}."
     if k == "risk_rating":
-        return f"The risk rating for {scheme_name} is {v}."
+        return f"The risk-reward rating for {scheme_name} is {v} out of 10."
     if k == "nfo_risk":
         return f"The riskometer for {scheme_name} is {v}."
     if k == "fund_manager":
@@ -483,29 +639,23 @@ def answer_query(
                 rest = [h for h in hits if h.chunk_id != fill.chunk_id]
                 hits = [fill] + rest
 
-    if "groww_rating" in intent_nav and not _hits_include_groww_rating_line(hits):
+    rating_intent = intent_nav & {"groww_rating", "risk_rating", "nfo_risk"}
+    if rating_intent:
         scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
-        if scan_schemes:
-            fill = _first_chunk_hit_with_groww_rating(chunks_root, scan_schemes)
-            if fill:
-                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
-                hits = [fill] + rest
+        if scan_schemes and len(scan_schemes) == 1:
+            sid = next(iter(scan_schemes))
+            fill_hit, _fill_lines = _resolve_scheme_rating(chunks_root, sid, intent_nav)
+            if fill_hit:
+                rest = [h for h in hits if h.chunk_id != fill_hit.chunk_id]
+                hits = [fill_hit] + rest
+            elif not hits:
+                hits = []
 
-    if "risk_rating" in intent_nav and not _hits_include_risk_rating_line(hits):
-        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
-        if scan_schemes:
-            fill = _first_chunk_hit_with_risk_rating(chunks_root, scan_schemes)
-            if fill:
-                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
-                hits = [fill] + rest
-
-    if "nfo_risk" in intent_nav and not _hits_include_nfo_risk_line(hits):
-        scan_schemes = scheme_filter if scheme_filter else ({hits[0].scheme_id} if hits else None)
-        if scan_schemes:
-            fill = _first_chunk_hit_with_nfo_risk(chunks_root, scan_schemes)
-            if fill:
-                rest = [h for h in hits if h.chunk_id != fill.chunk_id]
-                hits = [fill] + rest
+    if not hits and rating_intent and scheme_filter and len(scheme_filter) == 1:
+        sid = next(iter(scheme_filter))
+        fill_hit, _fill_lines = _resolve_scheme_rating(chunks_root, sid, intent_nav)
+        if fill_hit:
+            hits = [fill_hit]
 
     if not hits:
         # No hit → still return a safe response without fabricating facts.
@@ -526,10 +676,19 @@ def answer_query(
     canonical: list[str] = []
     if extract_keys:
         for h in hits:
-            canonical = _canonical_value_lines(h.text, intent)
+            canonical = _canonical_value_lines(h.text, intent, scheme_id=h.scheme_id)
             if canonical:
                 top = h
                 break
+
+        if not canonical and rating_intent:
+            scan_schemes = scheme_filter if scheme_filter else {top.scheme_id}
+            if len(scan_schemes) == 1:
+                sid = next(iter(scan_schemes))
+                fill_hit, fill_lines = _resolve_scheme_rating(chunks_root, sid, intent)
+                if fill_lines:
+                    top = fill_hit or top
+                    canonical = fill_lines
 
         # If the user asked for a specific factual key and we couldn't find the exact `key: value`
         # line anywhere in the retrieved hits, treat as UNKNOWN (avoid answering with an unrelated fact).
