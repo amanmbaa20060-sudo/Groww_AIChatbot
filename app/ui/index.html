@@ -3,50 +3,86 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Groww Mutual Fund FAQ (Facts-only)</title>
+    <title>FundFacts AI</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="app">
-      <header class="header">
-        <div class="title">Groww Mutual Fund FAQ Assistant</div>
-        <div class="subtitle">Facts-only. Closed corpus (17 Groww scheme pages). No investment advice. LLM provider: Groq (optional).</div>
-      </header>
+    <nav class="topnav" aria-label="Main navigation">
+      <div class="topnav-inner">
+        <div class="brand">FundFacts AI</div>
+        <div class="navlinks" role="navigation">
+          <a href="#" class="navlink active" aria-current="page">Explorer</a>
+          <a href="#" class="navlink">Schemes</a>
+          <a href="#" class="navlink">Guides</a>
+        </div>
+        <div class="navactions">
+          <button type="button" class="icon-btn" aria-label="Help" title="Help">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-.8.6-1.2 1.1-1.2 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>
+          </button>
+          <button type="button" class="icon-btn" aria-label="Profile" title="Profile">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 19c1.5-3 4-4.5 7-4.5s5.5 1.5 7 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </nav>
 
-      <section class="card">
-        <div class="cardTitle">Try an example</div>
-        <div class="row" style="margin-bottom: 10px;">
-          <div class="label">Scheme (optional)</div>
-          <select id="schemeSelect" class="select" aria-label="Select a scheme">
-            <option value="">Auto-detect from question</option>
-          </select>
-        </div>
-        <div class="examples" id="examples">
-          <button class="chip" data-q="What is the exit load?">Exit load</button>
-          <button class="chip" data-q="What is the expense ratio?">Expense ratio</button>
-          <button class="chip" data-q="What is the ELSS lock-in?">ELSS lock-in</button>
-        </div>
-        <div class="disclaimer" role="note">
-          <b>Facts-only. No investment advice.</b>
-          <br />
-          Privacy: Don’t share PAN, Aadhaar, OTP, bank details, phone, email, or transaction/portfolio details.
-        </div>
-      </section>
+    <div class="page">
+      <div class="decor" aria-hidden="true"></div>
 
-      <main class="chat card">
-        <div class="messages" id="messages"></div>
-        <form class="composer" id="composer">
-          <input id="query" class="input" type="text" placeholder="Ask a factual question (e.g., exit load, benchmark, fund manager)…" />
-          <button class="btn" type="submit" id="sendBtn">Send</button>
-        </form>
+      <main class="main">
+        <section class="example-card" aria-label="Try an example">
+          <div class="example-title">
+            <span class="bolt" aria-hidden="true">⚡</span>
+            Try an example
+          </div>
+          <div class="example-row">
+            <select id="schemeSelect" class="scheme-select" aria-label="Select a scheme">
+              <option value="">Auto-detect from question</option>
+            </select>
+            <div class="examples" id="examples">
+              <button type="button" class="chip" data-q="What is the exit load?">Exit load</button>
+              <button type="button" class="chip" data-q="What is the expense ratio?">Expense ratio</button>
+              <button type="button" class="chip" data-q="Who is the fund manager?">Fund Manager</button>
+              <button type="button" class="chip" data-q="What is the AUM?">AUM</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="chat" aria-label="Chat">
+          <div class="messages" id="messages"></div>
+        </section>
       </main>
 
-      <footer class="footer">
-        Backend: <span id="backendUrl"></span>
+      <footer class="bottom">
+        <form class="composer" id="composer">
+          <div class="composer-field">
+            <input
+              id="query"
+              class="input"
+              type="text"
+              placeholder="Ask about expense ratios, exit loads, or fund returns..."
+              autocomplete="off"
+            />
+            <button class="send-btn" type="submit" id="sendBtn" aria-label="Send">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"/>
+                <path d="M13 7l5 5-5 5"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+        <p class="footer-note">
+          FundFacts AI provides factual mutual fund data based on historical disclosures. Not financial advice.
+        </p>
+        <div class="footer-links">
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Service</a>
+          <a href="#">Disclaimer</a>
+        </div>
+        <p class="footer-backend">API: <span id="backendUrl"></span></p>
       </footer>
     </div>
 
     <script src="/app.js"></script>
   </body>
 </html>
-

@@ -1,0 +1,59 @@
+# Phase 6 scheduled corpus refresh (docs/phase-wise-architecture.md §9.1)
+name: Corpus refresh (scheduler)
+
+on:
+  schedule:
+    # Weekly: Monday 02:00 UTC
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate closed corpus manifest (Phase 0)
+        run: python scripts/validate_manifest.py
+
+      - name: Run Phase 1.6 orchestrator (1.1 → 1.5 + registry)
+        run: python -m ingestion.phase1.subphase_1_6_orchestrate --ignore-robots
+
+      - name: Upload index + registry artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-snapshot
+          path: |
+            data/index/
+            data/registry/
+            data/chunks/
+            data/embeddings/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit refreshed data artifacts (if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/index data/registry data/chunks data/embeddings
+          if git diff --staged --quiet; then
+            echo "No data changes to commit."
+          else
+            git commit -m "chore(scheduler): refresh corpus index [skip ci]"
+            git push
+          fi

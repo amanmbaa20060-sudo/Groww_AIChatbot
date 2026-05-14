@@ -1,7 +1,7 @@
 {
-  "ingestion_batch_date_utc": "2026-05-07",
-  "ingestion_batch_id": "batch_2026-05-07_1778148143",
+  "ingestion_batch_date_utc": "2026-05-14",
+  "ingestion_batch_id": "batch_2026-05-14_1778753620",
   "index_name": "groww_hash_v1_dim768",
   "index_meta_path": "C:\\Users\\Rukma\\.cursor\\GrowwRAGChatbot_M2\\data\\index\\groww_hash_v1_dim768\\index_meta.json",
-  "written_at_utc": "2026-05-07T10:02:31Z"
+  "written_at_utc": "2026-05-14T10:13:55Z"
 }
