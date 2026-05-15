@@ -32,6 +32,18 @@ _PLACEHOLDER_HOSTS = frozenset(
     }
 )
 
+_DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant"
+
+
+def _groq_model_name() -> str:
+    try:
+        from_secrets = st.secrets.get("GROQ_MODEL")
+        if from_secrets:
+            return str(from_secrets).strip()
+    except Exception:
+        pass
+    return os.getenv("GROQ_MODEL", _DEFAULT_GROQ_MODEL).strip() or _DEFAULT_GROQ_MODEL
+
 # Right-arrow send icon (matches app/ui/index.html send-btn SVG)
 _SEND_ARROW_SVG = (
     "data:image/svg+xml,"
@@ -194,6 +206,20 @@ div[data-baseweb="select"] > div {{
   background: url("{_SEND_ARROW_SVG}") center / contain no-repeat !important;
 }}
 
+.llm-status-pill {{
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #0a0f0d;
+  background: #a5f3d0;
+}}
+.llm-meta-on {{ color: #a5f3d0 !important; font-weight: 600; }}
+.llm-meta-off {{ color: #8fa39a !important; }}
+
 .footer-note {{
   color: #5c6f68;
   font-size: 12px;
@@ -289,14 +315,35 @@ def _clear_chat() -> None:
     st.session_state.pending_query = ""
 
 
-def _render_meta(citation_url: str | None, last_updated: str | None) -> None:
+def _render_llm_status_badge() -> None:
+    """App-level indicator that requests use Groq LLM."""
+    st.markdown(
+        f'<span class="llm-status-pill">LLM on · Groq {_groq_model_name()}</span>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_meta(
+    citation_url: str | None,
+    last_updated: str | None,
+    *,
+    llm_used: bool | None = None,
+    groq_model: str | None = None,
+    llm_error: str | None = None,
+) -> None:
     parts: list[str] = []
+    if llm_used is True and groq_model:
+        parts.append(f"**LLM answer** · `{groq_model}`")
+    elif llm_used is False:
+        parts.append("**Corpus answer** (verbatim, no LLM)")
     if citation_url:
         parts.append(f"[Source link]({citation_url})")
     if last_updated:
         parts.append(f"Updated: {last_updated}")
     if parts:
         st.caption(" · ".join(parts))
+    if llm_error:
+        st.caption(f"LLM fallback: {llm_error}")
 
 
 def _render_advisory_suggestions() -> None:
@@ -326,7 +373,13 @@ def _render_composer() -> str | None:
 
 def _ask(query: str, scheme_id: str) -> None:
     st.session_state.messages.append({"role": "user", "content": query})
-    body: dict[str, Any] = {"query": query}
+    groq_model = _groq_model_name()
+    body: dict[str, Any] = {
+        "query": query,
+        "use_groq": True,
+        "force_groq": True,
+        "groq_model": groq_model,
+    }
     if scheme_id:
         body["scheme_ids"] = [scheme_id]
     try:
@@ -339,6 +392,9 @@ def _ask(query: str, scheme_id: str) -> None:
                 "label": label,
                 "citation_url": data.get("citation_url"),
                 "last_updated": data.get("last_updated_from_sources_utc"),
+                "llm_used": bool(data.get("llm_used")),
+                "groq_model": data.get("groq_model") or groq_model,
+                "llm_error": data.get("llm_error"),
             }
         )
     except HTTPError as e:
@@ -378,6 +434,7 @@ def main() -> None:
     with head_l:
         st.title("Fundfacts FAQ RAG AI")
         st.caption("Factual mutual fund FAQ answers from the closed Groww corpus. Not financial advice.")
+        _render_llm_status_badge()
     with head_r:
         if st.button("New chat", type="secondary", use_container_width=True):
             _clear_chat()
@@ -431,7 +488,13 @@ def main() -> None:
         with st.chat_message(msg["role"], avatar="🤖" if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
             if msg["role"] == "assistant":
-                _render_meta(msg.get("citation_url"), msg.get("last_updated"))
+                _render_meta(
+                    msg.get("citation_url"),
+                    msg.get("last_updated"),
+                    llm_used=msg.get("llm_used"),
+                    groq_model=msg.get("groq_model"),
+                    llm_error=msg.get("llm_error"),
+                )
                 label = msg.get("label") or ""
                 if label in {"ADVISORY", "COMPARISON"}:
                     _render_advisory_suggestions()
