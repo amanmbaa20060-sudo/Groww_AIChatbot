@@ -339,7 +339,63 @@ def _resolve_scheme_rating(
         return meta_hit, [meta_line]
     if primary_line and primary_hit:
         return primary_hit, [primary_line]
+    # Some scheme pages omit a numeric Groww star (and meta_desc uses null/10) but still publish
+    # riskometer (nfo_risk) and return_stats[0].risk_rating — answer from those when user asks "rating".
+    if "groww_rating" in intent:
+        fb_hit, fb_lines = _groww_rating_fallback_when_no_star(chunks_root, scheme_id)
+        if fb_lines:
+            return fb_hit, fb_lines
     return None, []
+
+
+def _groww_rating_fallback_when_no_star(chunks_root: Path, scheme_id: str) -> tuple[ChunkHit | None, list[str]]:
+    """
+    Grounded substitute when there is no groww_rating / peer / valid meta risk-reward in the corpus
+    (e.g. HDFC Defence: meta_desc has null/10, no groww_rating key).
+    """
+    nfo_line: str | None = None
+    rr_line: str | None = None
+    nfo_hit: ChunkHit | None = None
+    rr_hit: ChunkHit | None = None
+
+    def _as_hit(row: dict[str, Any]) -> ChunkHit:
+        return ChunkHit(
+            chunk_id=str(row["chunk_id"]),
+            scheme_id=str(row["scheme_id"]),
+            source_url=str(row["source_url"]),
+            doc_type=str(row.get("doc_type") or ""),
+            section_path=str(row.get("section_path") or ""),
+            score=0.0,
+            text=str(row.get("text") or ""),
+        )
+
+    for row in iter_chunks(chunks_root, scheme_ids={scheme_id}):
+        text = str(row.get("text") or "")
+        if not text:
+            continue
+        hit = _as_hit(row)
+        if nfo_line is None:
+            nfo_line = _extract_nfo_risk_line(text)
+            if nfo_line:
+                nfo_hit = hit
+        if rr_line is None:
+            m = _RETURN_STATS_RISK_RATING.search(text)
+            if m and _is_valid_rating_value(m.group(1)):
+                rr_line = f"risk_rating: {m.group(1).strip()}"
+                rr_hit = hit
+        if nfo_line and rr_line:
+            break
+
+    if not nfo_line and not rr_line:
+        return None, []
+
+    lines: list[str] = []
+    if nfo_line:
+        lines.append(nfo_line)
+    if rr_line:
+        lines.append(rr_line)
+    cite_hit = nfo_hit or rr_hit
+    return cite_hit, lines
 
 
 def _first_chunk_hit_with_groww_rating(
@@ -566,6 +622,35 @@ def _friendly_one_liner(*, scheme_name: str, key: str, value: str, extra: str | 
     return f"The {k.replace('_', ' ')} for {scheme_name} is {v}."
 
 
+def _friendly_groww_rating_fallback_bundle(scheme_name: str, lines: list[str]) -> str:
+    """When the page has no numeric Groww star but still lists riskometer / risk score (e.g. HDFC Defence)."""
+    rr_v: str | None = None
+    nfo_v: str | None = None
+    for ln in lines:
+        kv = _parse_key_value(ln)
+        if not kv:
+            continue
+        k, v = kv[0].lower(), kv[1]
+        if k == "risk_rating":
+            rr_v = v
+        elif k == "nfo_risk":
+            nfo_v = v
+    parts = [
+        f"The indexed Groww scheme page does not list a numeric Groww star rating (out of 5) for {scheme_name}."
+    ]
+    if nfo_v:
+        parts.append(f"The riskometer on the page is {nfo_v}.")
+    if rr_v:
+        parts.append(f"The numeric risk score in the page data is {rr_v} out of 10.")
+    return " ".join(parts)
+
+
+def _is_groww_rating_fallback_bundle(intent: set[str], lines: list[str]) -> bool:
+    if "groww_rating" not in intent or not lines:
+        return False
+    return not lines[0].lower().startswith("groww_rating:")
+
+
 def _parse_key_value(line: str) -> tuple[str, str] | None:
     if ":" not in line:
         return None
@@ -729,6 +814,8 @@ def answer_query(
         m = re.match(r"^\s*nav:\s*(.+?)\s*\(\s*nav_date:\s*(.+?)\s*\)\s*$", ln, flags=re.IGNORECASE)
         if m:
             a = _friendly_one_liner(scheme_name=scheme_name, key="nav", value=m.group(1), extra=m.group(2))
+        elif "groww_rating" in intent and _is_groww_rating_fallback_bundle(intent, lines):
+            a = _friendly_groww_rating_fallback_bundle(scheme_name, lines)
         else:
             kv = _parse_key_value(ln)
             if kv:
