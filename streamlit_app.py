@@ -44,23 +44,38 @@ def _groq_model_name() -> str:
         pass
     return os.getenv("GROQ_MODEL", _DEFAULT_GROQ_MODEL).strip() or _DEFAULT_GROQ_MODEL
 
-# Right-arrow send icon (matches app/ui/index.html send-btn SVG)
+# Right-arrow send icon (matches app/ui/index.html send-btn SVG, white on green button)
 _SEND_ARROW_SVG = (
     "data:image/svg+xml,"
     "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' "
-    "stroke='%230a0f0d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E"
+    "stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E"
     "%3Cpath d='M5 12h14'/%3E%3Cpath d='M13 7l5 5-5 5'/%3E%3C/svg%3E"
 )
 
+# Light theme tokens (aligned with app/ui/styles.css)
+_T = {
+    "bg": "#f4f6f5",
+    "surface": "#ffffff",
+    "surface2": "#eef2f0",
+    "text": "#1a2e28",
+    "muted": "#5c6f68",
+    "muted_dim": "#8fa39a",
+    "accent": "#0b5f46",
+    "accent_dim": "#2d9c72",
+    "border": "#e2e8e5",
+    "shadow": "0 8px 32px rgba(26, 46, 40, 0.08)",
+}
+
 _CUSTOM_CSS = f"""
 <style>
-/* Prevent title / New chat from sitting under Streamlit app chrome */
+/* Light theme — aligned with app/ui/styles.css */
 .stApp {{
-  background-color: #0a0f0d;
+  background-color: {_T["bg"]};
+  color: {_T["text"]};
 }}
 header[data-testid="stHeader"] {{
-  background: rgba(10, 15, 13, 0.96) !important;
-  border-bottom: 1px solid #24332e;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid {_T["border"]};
 }}
 [data-testid="stAppViewContainer"] [data-testid="stMain"] > div {{
   padding-top: 2.75rem !important;
@@ -74,6 +89,10 @@ header[data-testid="stHeader"] {{
   margin-top: 0 !important;
   padding-top: 0 !important;
 }}
+[data-testid="stVerticalBlockBorderWrapper"] {{
+  border-color: {_T["border"]} !important;
+  background: {_T["surface"]} !important;
+}}
 
 /* Page header — title + New chat */
 .fundfacts-header {{
@@ -82,7 +101,7 @@ header[data-testid="stHeader"] {{
   overflow: visible;
 }}
 .fundfacts-header h1 {{
-  color: #e8f0ed !important;
+  color: {_T["text"]} !important;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-size: 1.75rem !important;
@@ -92,6 +111,7 @@ header[data-testid="stHeader"] {{
 }}
 .fundfacts-header [data-testid="stCaptionContainer"] p {{
   margin: 0 !important;
+  color: {_T["muted"]} !important;
 }}
 .fundfacts-header [data-testid="column"]:last-child {{
   display: flex;
@@ -104,33 +124,36 @@ header[data-testid="stHeader"] {{
 }}
 
 h1 {{
-  color: #e8f0ed !important;
+  color: {_T["text"]} !important;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-size: 1.75rem !important;
 }}
 div[data-testid="stCaptionContainer"] p,
-.stCaption {{ color: #8fa39a !important; }}
+.stCaption {{ color: {_T["muted"]} !important; }}
 div[data-testid="stChatMessage"] {{
-  background: #161f1c;
-  border: 1px solid #24332e;
+  background: {_T["surface"]};
+  border: 1px solid {_T["border"]};
   border-radius: 14px;
   padding: 0.35rem 0.75rem;
   margin-bottom: 0.5rem;
+  box-shadow: {_T["shadow"]};
 }}
-div[data-testid="stChatMessage"] p {{ color: #e8f0ed; }}
+div[data-testid="stChatMessage"] p {{ color: {_T["text"]}; }}
 div[data-baseweb="select"] > div {{
-  background: #161f1c !important;
-  border-color: #24332e !important;
+  background: {_T["surface"]} !important;
+  border-color: {_T["border"]} !important;
+  color: {_T["text"]} !important;
 }}
 .stButton > button[kind="secondary"] {{
-  border-color: rgba(165, 243, 208, 0.2);
-  color: #a5f3d0;
-  background: rgba(165, 243, 208, 0.08);
+  border-color: {_T["border"]};
+  color: {_T["accent_dim"]};
+  background: rgba(45, 156, 114, 0.1);
 }}
 .stButton > button[kind="secondary"]:hover {{
-  border-color: #2d9c72;
-  background: rgba(45, 156, 114, 0.2);
+  border-color: {_T["accent_dim"]};
+  background: rgba(45, 156, 114, 0.18);
+  color: {_T["accent"]};
 }}
 
 /* Composer — matches app/ui/styles.css .input + .send-btn */
@@ -144,16 +167,16 @@ div[data-baseweb="select"] > div {{
 .fundfacts-composer [data-testid="stTextInput"] label {{ display: none !important; }}
 .fundfacts-composer [data-testid="stTextInput"] input {{
   width: 100% !important;
-  background: #161f1c !important;
-  border: 1px solid #24332e !important;
+  background: {_T["surface"]} !important;
+  border: 1px solid {_T["border"]} !important;
   border-radius: 14px !important;
-  color: #e8f0ed !important;
+  color: {_T["text"]} !important;
   padding: 16px 56px 16px 18px !important;
   font-size: 14px !important;
   min-height: 54px !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: {_T["shadow"]} !important;
 }}
-.fundfacts-composer [data-testid="stTextInput"] input::placeholder {{ color: #5c6f68 !important; }}
+.fundfacts-composer [data-testid="stTextInput"] input::placeholder {{ color: {_T["muted_dim"]} !important; }}
 .fundfacts-composer [data-testid="stTextInput"] input:focus {{
   border-color: #2d9c72 !important;
   box-shadow: 0 0 0 3px rgba(45, 156, 114, 0.18) !important;
@@ -174,18 +197,17 @@ div[data-baseweb="select"] > div {{
   height: 42px !important;
   min-height: 42px !important;
   border-radius: 12px !important;
-  background: #a5f3d0 !important;
+  background: {_T["accent_dim"]} !important;
   border: none !important;
-  color: #0a0f0d !important;
+  color: #ffffff !important;
   padding: 0 !important;
   display: grid !important;
   place-items: center !important;
   box-shadow: none !important;
 }}
 .fundfacts-composer [data-testid="stFormSubmitButton"] button:hover {{
-  background: #bff7e0 !important;
+  background: #248f66 !important;
   border: none !important;
-  color: #0a0f0d !important;
 }}
 .fundfacts-composer [data-testid="stFormSubmitButton"] button:disabled {{
   opacity: 0.5 !important;
@@ -214,14 +236,14 @@ div[data-baseweb="select"] > div {{
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #0a0f0d;
-  background: #a5f3d0;
+  color: #ffffff;
+  background: {_T["accent_dim"]};
 }}
-.llm-meta-on {{ color: #a5f3d0 !important; font-weight: 600; }}
-.llm-meta-off {{ color: #8fa39a !important; }}
+.llm-meta-on {{ color: {_T["accent_dim"]} !important; font-weight: 600; }}
+.llm-meta-off {{ color: {_T["muted"]} !important; }}
 
 .footer-note {{
-  color: #5c6f68;
+  color: {_T["muted_dim"]};
   font-size: 12px;
   margin: 14px 0 20px;
   text-align: center;
