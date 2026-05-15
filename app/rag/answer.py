@@ -525,9 +525,19 @@ def _load_last_updated(registry_latest_path: Path, *, fallback: str = "1970-01-0
         obj = json.loads(registry_latest_path.read_text(encoding="utf-8"))
     except Exception:
         return fallback
+    candidates: list[str] = []
     v = obj.get("ingestion_batch_date_utc")
     if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
-        return v
+        candidates.append(v)
+    # Orchestrator always sets written_at_utc; use its UTC calendar date so the footer
+    # reflects the last successful index write even if batch_date metadata lagged.
+    wt = obj.get("written_at_utc")
+    if isinstance(wt, str):
+        m = re.match(r"^(\d{4}-\d{2}-\d{2})[Tt ]", wt.strip())
+        if m and re.fullmatch(r"\d{4}-\d{2}-\d{2}", m.group(1)):
+            candidates.append(m.group(1))
+    if candidates:
+        return max(candidates)
     return fallback
 
 
