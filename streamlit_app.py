@@ -18,6 +18,12 @@ EXAMPLE_QUESTIONS = (
     ("AUM", "What is the AUM?"),
 )
 
+ADVISORY_SUGGESTIONS = (
+    ("Expense ratio", "What is the expense ratio?"),
+    ("Exit load", "What is the exit load?"),
+    ("Benchmark", "What is the benchmark?"),
+)
+
 _PLACEHOLDER_HOSTS = frozenset(
     {
         "your-render-backend.onrender.com",
@@ -25,6 +31,47 @@ _PLACEHOLDER_HOSTS = frozenset(
         "127.0.0.1",
     }
 )
+
+_CUSTOM_CSS = """
+<style>
+.block-container { padding-top: 1rem; max-width: 920px; }
+h1 {
+  color: #e8f0ed !important;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 1.75rem !important;
+}
+div[data-testid="stCaptionContainer"] p,
+.stCaption { color: #8fa39a !important; }
+div[data-testid="stChatMessage"] {
+  background: #161f1c;
+  border: 1px solid #24332e;
+  border-radius: 14px;
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+div[data-testid="stChatMessage"] p { color: #e8f0ed; }
+div[data-baseweb="select"] > div {
+  background: #161f1c !important;
+  border-color: #24332e !important;
+}
+.stButton > button[kind="secondary"] {
+  border-color: rgba(165, 243, 208, 0.2);
+  color: #a5f3d0;
+  background: rgba(165, 243, 208, 0.08);
+}
+.stButton > button[kind="secondary"]:hover {
+  border-color: #2d9c72;
+  background: rgba(45, 156, 114, 0.2);
+}
+.footer-note {
+  color: #5c6f68;
+  font-size: 0.8rem;
+  margin-top: 2rem;
+  text-align: center;
+}
+</style>
+"""
 
 
 def _is_streamlit_cloud() -> bool:
@@ -107,7 +154,12 @@ def _init_state() -> None:
         st.session_state.pending_query = ""
 
 
-def _render_meta(citation_url: str | None, last_updated: str | None, llm_error: str | None) -> None:
+def _clear_chat() -> None:
+    st.session_state.messages = []
+    st.session_state.pending_query = ""
+
+
+def _render_meta(citation_url: str | None, last_updated: str | None) -> None:
     parts: list[str] = []
     if citation_url:
         parts.append(f"[Source link]({citation_url})")
@@ -115,8 +167,15 @@ def _render_meta(citation_url: str | None, last_updated: str | None, llm_error: 
         parts.append(f"Updated: {last_updated}")
     if parts:
         st.caption(" · ".join(parts))
-    if llm_error:
-        st.caption(f"LLM note: {llm_error}")
+
+
+def _render_advisory_suggestions() -> None:
+    st.caption("Try a factual question instead:")
+    cols = st.columns(len(ADVISORY_SUGGESTIONS))
+    for col, (label, question) in zip(cols, ADVISORY_SUGGESTIONS):
+        if col.button(label, key=f"adv_{label}", use_container_width=True):
+            st.session_state.pending_query = question
+            st.rerun()
 
 
 def _ask(query: str, scheme_id: str) -> None:
@@ -126,29 +185,33 @@ def _ask(query: str, scheme_id: str) -> None:
         body["scheme_ids"] = [scheme_id]
     try:
         data = _http_json("POST", "/query", body)
+        label = str(data.get("label") or "")
         st.session_state.messages.append(
             {
                 "role": "assistant",
                 "content": data.get("answer_text") or "No response.",
+                "label": label,
                 "citation_url": data.get("citation_url"),
                 "last_updated": data.get("last_updated_from_sources_utc"),
-                "llm_error": data.get("llm_error"),
             }
         )
     except HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace") if e.fp else str(e)
         st.session_state.messages.append(
-            {"role": "assistant", "content": f"Backend error ({e.code}): {detail}"}
+            {"role": "assistant", "content": f"Backend error ({e.code}): {detail}", "label": "ERROR"}
         )
-    except URLError as e:
+    except URLError:
         st.session_state.messages.append(
             {
                 "role": "assistant",
                 "content": f"Could not reach the API at `{_backend_url()}`. Is the backend running?",
+                "label": "ERROR",
             }
         )
     except Exception as e:
-        st.session_state.messages.append({"role": "assistant", "content": f"Request failed: {e}"})
+        st.session_state.messages.append(
+            {"role": "assistant", "content": f"Request failed: {e}", "label": "ERROR"}
+        )
 
 
 def main() -> None:
@@ -158,34 +221,25 @@ def main() -> None:
         layout="wide",
         initial_sidebar_state="collapsed",
     )
-
-    st.markdown(
-        """
-        <style>
-        .block-container { padding-top: 1.25rem; max-width: 920px; }
-        h1 { color: #0b5f46; font-weight: 800; letter-spacing: -0.02em; }
-        div[data-testid="stChatMessage"] {
-            background: #ffffff;
-            border: 1px solid #e2e8e5;
-            border-radius: 14px;
-            padding: 0.35rem 0.75rem;
-            margin-bottom: 0.5rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(_CUSTOM_CSS, unsafe_allow_html=True)
 
     _init_state()
     backend = _backend_url()
     backend_issue = _backend_url_issue(backend)
 
-    st.title("Fundfacts FAQ RAG AI")
-    st.caption("Factual mutual fund FAQ answers from the closed Groww corpus. Not financial advice.")
+    head_l, head_r = st.columns([5, 1])
+    with head_l:
+        st.title("Fundfacts FAQ RAG AI")
+        st.caption("Factual mutual fund FAQ answers from the closed Groww corpus. Not financial advice.")
+    with head_r:
+        st.write("")
+        if st.button("New chat", type="secondary", use_container_width=True):
+            _clear_chat()
+            st.rerun()
 
     if backend_issue:
         st.error(backend_issue)
-        with st.expander("Example Streamlit secret", expanded=True):
+        with st.expander("Streamlit Cloud secret (required)", expanded=True):
             st.code(
                 'RAG_BACKEND_URL = "https://groww-rag-backend.onrender.com"',
                 language="toml",
@@ -205,6 +259,7 @@ def main() -> None:
         except Exception as e:
             st.error(f"Failed to load schemes from `{backend}/schemes`: {e}")
             st.stop()
+
         scheme_options = {"Auto-detect from question": ""}
         scheme_options.update({s["display_name"]: s["scheme_id"] for s in schemes})
         labels = list(scheme_options.keys())
@@ -229,11 +284,10 @@ def main() -> None:
         with st.chat_message(msg["role"], avatar="🤖" if msg["role"] == "assistant" else None):
             st.markdown(msg["content"])
             if msg["role"] == "assistant":
-                _render_meta(
-                    msg.get("citation_url"),
-                    msg.get("last_updated"),
-                    msg.get("llm_error"),
-                )
+                _render_meta(msg.get("citation_url"), msg.get("last_updated"))
+                label = msg.get("label") or ""
+                if label in {"ADVISORY", "COMPARISON"}:
+                    _render_advisory_suggestions()
 
     prompt = st.session_state.pending_query or st.chat_input(
         "Ask about expense ratios, exit loads, or fund returns..."
@@ -253,6 +307,11 @@ def main() -> None:
                 st.json(health)
             except Exception as e:
                 st.error(str(e))
+
+    st.markdown(
+        '<p class="footer-note">Fundfacts FAQ RAG AI · Facts from Groww scheme pages only · Not investment advice</p>',
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":

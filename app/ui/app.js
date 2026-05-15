@@ -207,9 +207,14 @@ function wireSuggestionClicks(root) {
   });
 }
 
+let requestInFlight = false;
+
 async function submitQuery(q) {
   const sendBtn = el("sendBtn");
   const input = el("query");
+  const newChatBtn = el("newChatBtn");
+  requestInFlight = true;
+  if (newChatBtn) newChatBtn.disabled = true;
   sendBtn.disabled = true;
   sendBtn.classList.add("processing");
   input.disabled = true;
@@ -250,6 +255,8 @@ async function submitQuery(q) {
       showSuggestions: false,
     });
   } finally {
+    requestInFlight = false;
+    if (el("newChatBtn")) el("newChatBtn").disabled = false;
     sendBtn.disabled = false;
     sendBtn.classList.remove("processing");
     input.disabled = false;
@@ -295,9 +302,42 @@ async function loadSchemes() {
   }
 }
 
+function startNewChat() {
+  if (requestInFlight) return;
+
+  removeLoadingMessage();
+
+  const sendBtn = el("sendBtn");
+  const input = el("query");
+  if (sendBtn) {
+    sendBtn.disabled = false;
+    sendBtn.classList.remove("processing");
+  }
+  if (input) {
+    input.disabled = false;
+    input.value = "";
+  }
+
+  const messages = el("messages");
+  if (messages) messages.innerHTML = "";
+
+  const schemeSelect = el("schemeSelect");
+  if (schemeSelect) schemeSelect.selectedIndex = 0;
+
+  setChatMode(false);
+  input?.focus();
+}
+
+function wireNewChat() {
+  const btn = el("newChatBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => startNewChat());
+}
+
 function init() {
   wireExamples();
   wireComposer();
+  wireNewChat();
   loadSchemes();
 }
 
