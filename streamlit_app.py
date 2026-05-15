@@ -42,7 +42,55 @@ _SEND_ARROW_SVG = (
 
 _CUSTOM_CSS = f"""
 <style>
-.block-container {{ padding-top: 1rem; max-width: 920px; }}
+/* Prevent title / New chat from sitting under Streamlit app chrome */
+.stApp {{
+  background-color: #0a0f0d;
+}}
+header[data-testid="stHeader"] {{
+  background: rgba(10, 15, 13, 0.96) !important;
+  border-bottom: 1px solid #24332e;
+}}
+[data-testid="stAppViewContainer"] [data-testid="stMain"] > div {{
+  padding-top: 2.75rem !important;
+}}
+.block-container {{
+  padding-top: 1.25rem !important;
+  padding-bottom: 2rem !important;
+  max-width: 920px;
+}}
+.block-container > div:first-child {{
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}}
+
+/* Page header — title + New chat */
+.fundfacts-header {{
+  padding-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  overflow: visible;
+}}
+.fundfacts-header h1 {{
+  color: #e8f0ed !important;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-size: 1.75rem !important;
+  line-height: 1.2 !important;
+  margin: 0 0 0.35rem 0 !important;
+  padding: 0 !important;
+}}
+.fundfacts-header [data-testid="stCaptionContainer"] p {{
+  margin: 0 !important;
+}}
+.fundfacts-header [data-testid="column"]:last-child {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding-top: 0.15rem;
+}}
+.fundfacts-header [data-testid="column"]:last-child [data-testid="stVerticalBlock"] {{
+  width: 100%;
+}}
+
 h1 {{
   color: #e8f0ed !important;
   font-weight: 800;
@@ -325,15 +373,16 @@ def main() -> None:
     backend = _backend_url()
     backend_issue = _backend_url_issue(backend)
 
-    head_l, head_r = st.columns([5, 1])
+    st.markdown('<div class="fundfacts-header">', unsafe_allow_html=True)
+    head_l, head_r = st.columns([5, 1], vertical_alignment="top")
     with head_l:
         st.title("Fundfacts FAQ RAG AI")
         st.caption("Factual mutual fund FAQ answers from the closed Groww corpus. Not financial advice.")
     with head_r:
-        st.write("")
         if st.button("New chat", type="secondary", use_container_width=True):
             _clear_chat()
             st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if backend_issue:
         st.error(backend_issue)
