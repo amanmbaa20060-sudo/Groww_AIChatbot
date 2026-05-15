@@ -4,6 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Fundfacts FAQ RAG AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -29,21 +35,61 @@
     <div class="page">
       <div class="decor" aria-hidden="true"></div>
 
+      <section class="hero" id="hero" aria-label="Welcome">
+        <div class="hero-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <h1 class="hero-title">Precision Financial Analysis</h1>
+        <p class="hero-sub">
+          Ask factual questions about mutual fund schemes from a closed corpus of 17 HDFC Groww pages.
+          Not investment advice.
+        </p>
+      </section>
+
       <main class="main">
         <section class="example-card" aria-label="Try an example">
           <div class="example-title">
-            <span class="bolt" aria-hidden="true">⚡</span>
+            <span class="bolt" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </span>
             Try an example
           </div>
-          <div class="example-row">
-            <select id="schemeSelect" class="scheme-select" aria-label="Select a scheme">
-              <option value="">Auto-detect from question</option>
-            </select>
-            <div class="examples" id="examples">
-              <button type="button" class="chip" data-q="What is the exit load?">Exit load</button>
-              <button type="button" class="chip" data-q="What is the expense ratio?">Expense ratio</button>
-              <button type="button" class="chip" data-q="Who is the fund manager?">Fund Manager</button>
-              <button type="button" class="chip" data-q="What is the AUM?">AUM</button>
+
+          <div class="field-group">
+            <label class="field-label" for="schemeSelect">Select scheme</label>
+            <div class="select-wrap">
+              <select id="schemeSelect" class="scheme-select" aria-label="Select a scheme">
+                <option value="">Auto-detect from question</option>
+              </select>
+              <svg class="select-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <span class="field-label">Recent analytics</span>
+            <div class="examples chips-row" id="examples">
+              <button type="button" class="chip" data-q="What is the exit load?">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l8-14 8 14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                Exit load
+              </button>
+              <button type="button" class="chip" data-q="What is the expense ratio?">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><text x="5" y="17" fill="currentColor" font-size="14" font-weight="700">%</text></svg>
+                Expense ratio
+              </button>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <span class="field-label">Suggested queries</span>
+            <div class="suggested-list" id="suggestedQueries">
+              <button type="button" class="suggested-row" data-q="What is the AUM?">
+                <span>What is the AUM?</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+              <button type="button" class="suggested-row" data-q="Who is the fund manager?">
+                <span>Who is the fund manager?</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
             </div>
           </div>
         </section>
@@ -74,12 +120,17 @@
         <p class="footer-note">
           Fundfacts FAQ RAG AI provides factual mutual fund data based on historical disclosures. Not financial advice.
         </p>
-        <div class="footer-links">
-          <a href="#">Privacy Policy</a>
-          <a href="#">Terms of Service</a>
-          <a href="#">Disclaimer</a>
+        <div class="page-footer">
+          <div class="page-footer-left">
+            <span class="page-footer-brand">Fundfacts FAQ RAG AI</span>
+            <span class="page-footer-copy">© 2026 Fundfacts FAQ RAG AI. Professional financial research tool.</span>
+          </div>
+          <div class="footer-links">
+            <a href="#">Privacy</a>
+            <a href="#">Terms</a>
+            <a href="#">Disclaimer</a>
+          </div>
         </div>
-        <p class="footer-backend">API: <span id="backendUrl"></span></p>
       </footer>
     </div>
 
