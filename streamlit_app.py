@@ -32,44 +32,126 @@ _PLACEHOLDER_HOSTS = frozenset(
     }
 )
 
-_CUSTOM_CSS = """
+# Right-arrow send icon (matches app/ui/index.html send-btn SVG)
+_SEND_ARROW_SVG = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' "
+    "stroke='%230a0f0d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E"
+    "%3Cpath d='M5 12h14'/%3E%3Cpath d='M13 7l5 5-5 5'/%3E%3C/svg%3E"
+)
+
+_CUSTOM_CSS = f"""
 <style>
-.block-container { padding-top: 1rem; max-width: 920px; }
-h1 {
+.block-container {{ padding-top: 1rem; max-width: 920px; }}
+h1 {{
   color: #e8f0ed !important;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-size: 1.75rem !important;
-}
+}}
 div[data-testid="stCaptionContainer"] p,
-.stCaption { color: #8fa39a !important; }
-div[data-testid="stChatMessage"] {
+.stCaption {{ color: #8fa39a !important; }}
+div[data-testid="stChatMessage"] {{
   background: #161f1c;
   border: 1px solid #24332e;
   border-radius: 14px;
   padding: 0.35rem 0.75rem;
   margin-bottom: 0.5rem;
-}
-div[data-testid="stChatMessage"] p { color: #e8f0ed; }
-div[data-baseweb="select"] > div {
+}}
+div[data-testid="stChatMessage"] p {{ color: #e8f0ed; }}
+div[data-baseweb="select"] > div {{
   background: #161f1c !important;
   border-color: #24332e !important;
-}
-.stButton > button[kind="secondary"] {
+}}
+.stButton > button[kind="secondary"] {{
   border-color: rgba(165, 243, 208, 0.2);
   color: #a5f3d0;
   background: rgba(165, 243, 208, 0.08);
-}
-.stButton > button[kind="secondary"]:hover {
+}}
+.stButton > button[kind="secondary"]:hover {{
   border-color: #2d9c72;
   background: rgba(45, 156, 114, 0.2);
-}
-.footer-note {
+}}
+
+/* Composer — matches app/ui/styles.css .input + .send-btn */
+.fundfacts-composer {{ margin-top: 12px; }}
+.fundfacts-composer [data-testid="stForm"] {{
+  border: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+}}
+.fundfacts-composer [data-testid="stForm"] > div {{ position: relative !important; }}
+.fundfacts-composer [data-testid="stTextInput"] label {{ display: none !important; }}
+.fundfacts-composer [data-testid="stTextInput"] input {{
+  width: 100% !important;
+  background: #161f1c !important;
+  border: 1px solid #24332e !important;
+  border-radius: 14px !important;
+  color: #e8f0ed !important;
+  padding: 16px 56px 16px 18px !important;
+  font-size: 14px !important;
+  min-height: 54px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45) !important;
+}}
+.fundfacts-composer [data-testid="stTextInput"] input::placeholder {{ color: #5c6f68 !important; }}
+.fundfacts-composer [data-testid="stTextInput"] input:focus {{
+  border-color: #2d9c72 !important;
+  box-shadow: 0 0 0 3px rgba(45, 156, 114, 0.18) !important;
+}}
+.fundfacts-composer [data-testid="stFormSubmitButton"] {{
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 5 !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}}
+.fundfacts-composer [data-testid="stFormSubmitButton"] button {{
+  width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  border-radius: 12px !important;
+  background: #a5f3d0 !important;
+  border: none !important;
+  color: #0a0f0d !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  box-shadow: none !important;
+}}
+.fundfacts-composer [data-testid="stFormSubmitButton"] button:hover {{
+  background: #bff7e0 !important;
+  border: none !important;
+  color: #0a0f0d !important;
+}}
+.fundfacts-composer [data-testid="stFormSubmitButton"] button:disabled {{
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}}
+.fundfacts-composer [data-testid="stFormSubmitButton"] button p,
+.fundfacts-composer [data-testid="stFormSubmitButton"] button span,
+.fundfacts-composer [data-testid="stFormSubmitButton"] button div {{
+  display: none !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}}
+.fundfacts-composer [data-testid="stFormSubmitButton"] button::after {{
+  content: "" !important;
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  background: url("{_SEND_ARROW_SVG}") center / contain no-repeat !important;
+}}
+
+.footer-note {{
   color: #5c6f68;
-  font-size: 0.8rem;
-  margin-top: 2rem;
+  font-size: 12px;
+  margin: 14px 0 20px;
   text-align: center;
-}
+}}
 </style>
 """
 
@@ -176,6 +258,22 @@ def _render_advisory_suggestions() -> None:
         if col.button(label, key=f"adv_{label}", use_container_width=True):
             st.session_state.pending_query = question
             st.rerun()
+
+
+def _render_composer() -> str | None:
+    """Custom composer with mint send button matching the static UI design."""
+    st.markdown('<div class="fundfacts-composer">', unsafe_allow_html=True)
+    with st.form("fundfacts_composer", clear_on_submit=True, border=False):
+        query = st.text_input(
+            "Query",
+            placeholder="Ask about expense ratios, exit loads, or fund returns...",
+            label_visibility="collapsed",
+        )
+        submitted = st.form_submit_button("Send", help="Send")
+    st.markdown("</div>", unsafe_allow_html=True)
+    if submitted and query and query.strip():
+        return query.strip()
+    return None
 
 
 def _ask(query: str, scheme_id: str) -> None:
@@ -289,27 +387,20 @@ def main() -> None:
                 if label in {"ADVISORY", "COMPARISON"}:
                     _render_advisory_suggestions()
 
-    prompt = st.session_state.pending_query or st.chat_input(
-        "Ask about expense ratios, exit loads, or fund returns..."
-    )
+    prompt: str | None = None
     if st.session_state.pending_query:
+        prompt = st.session_state.pending_query
         st.session_state.pending_query = ""
+    else:
+        prompt = _render_composer()
 
     if prompt:
         _ask(prompt.strip(), st.session_state.scheme_id)
         st.rerun()
 
-    with st.expander("API connection", expanded=False):
-        st.code(backend, language=None)
-        if st.button("Check /health"):
-            try:
-                health = _http_json("GET", "/health")
-                st.json(health)
-            except Exception as e:
-                st.error(str(e))
-
     st.markdown(
-        '<p class="footer-note">Fundfacts FAQ RAG AI · Facts from Groww scheme pages only · Not investment advice</p>',
+        '<p class="footer-note">Fundfacts FAQ RAG AI provides factual mutual fund data based on '
+        "historical disclosures. Not financial advice.</p>",
         unsafe_allow_html=True,
     )
 
