@@ -1,7 +1,7 @@
 {
   "phase": "1.5",
   "index_name": "groww_hash_v1_dim768",
-  "built_at_utc": "2026-06-06T07:34:11Z",
+  "built_at_utc": "2026-06-07T08:07:23Z",
   "embedding_model": "hash_v1_blake2b_salt=groww_rag_hash_v1_dim=768",
   "embedding_dim": 768,
   "rows": 957,
@@ -11,7 +11,7 @@
   "meta_file": "meta.jsonl",
   "faiss_index_file": "index.faiss",
   "faiss_index_type": "IndexFlatIP",
-  "ingestion_batch_date_utc": "2026-06-06",
-  "ingestion_batch_id": "batch_2026-06-06_1780731242",
-  "orchestrated_at_utc": "2026-06-06T07:34:11Z"
+  "ingestion_batch_date_utc": "2026-06-07",
+  "ingestion_batch_id": "batch_2026-06-07_1780819637",
+  "orchestrated_at_utc": "2026-06-07T08:07:23Z"
 }
