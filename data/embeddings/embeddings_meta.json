@@ -2,7 +2,7 @@
   "phase": "1.4",
   "embedding_model": "hash_v1_blake2b_salt=groww_rag_hash_v1_dim=768",
   "embedding_dim": 768,
-  "embedded_at_utc": "2026-06-26T08:09:10Z",
+  "embedded_at_utc": "2026-06-27T07:36:17Z",
   "total_written": 958,
   "total_skipped_existing": 0
 }
