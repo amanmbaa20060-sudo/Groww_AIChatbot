@@ -1,7 +1,7 @@
 {
-  "ingestion_batch_date_utc": "2026-08-31",
-  "ingestion_batch_id": "batch_2026-08-31_1788174296",
+  "ingestion_batch_date_utc": "2026-09-01",
+  "ingestion_batch_id": "batch_2026-09-01_1788255196",
   "index_name": "groww_hash_v1_dim768",
   "index_meta_path": "/home/runner/work/Groww_AIChatbot/Groww_AIChatbot/data/index/groww_hash_v1_dim768/index_meta.json",
-  "written_at_utc": "2026-08-31T11:05:08Z"
+  "written_at_utc": "2026-09-01T09:33:23Z"
 }
